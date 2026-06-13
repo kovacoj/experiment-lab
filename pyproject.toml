@@ -5,6 +5,8 @@ description = "Portable Signal Foundry labs template"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.118.0",
+    "httpx>=0.28.0",
     "huggingface-hub>=1.19.0",
     "polars>=1.40.1",
     "protobuf>=7.35.1",
@@ -14,6 +16,7 @@ dependencies = [
     "sentencepiece>=0.2.1",
     "torch>=2.12.0",
     "transformers>=5.12.0",
+    "uvicorn>=0.36.0",
 ]
 
 [build-system]
