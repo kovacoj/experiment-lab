@@ -1,0 +1,21 @@
+services:
+  experiment-lab:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: experiment-lab:latest
+    command: python -m app.labs.runner --scenario reputation_monitor
+
+  experiment-lab-supply-chain:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: experiment-lab:latest
+    command: python -m app.labs.runner --scenario supply_chain_risk
+
+  experiment-lab-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: experiment-lab:latest
+    command: python -m unittest discover -s tests
