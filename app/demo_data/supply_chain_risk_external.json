@@ -1,0 +1,7 @@
+[
+  {"dataset": "lead_time_signals", "component": "MCU chip", "lead_time_weeks": 16},
+  {"dataset": "commodity_signals", "component": "lithium battery pack", "price_change_pct_3m": 0.34, "predicted_cost_increase_pct": 0.15},
+  {"dataset": "shipping_signals", "route": "asia-hamburg-prague", "port": "Hamburg", "delay_days": 5},
+  {"dataset": "supplier_announcements", "component": "lithium battery pack", "detail": "Supplier announced pricing pressure for next quarter."},
+  {"dataset": "geopolitical_signals", "region": "Taiwan/Asia", "risk_score": 0.38, "detail": "No immediate sanction or geopolitical trigger in cached data."}
+]

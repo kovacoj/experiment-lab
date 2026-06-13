@@ -1,0 +1,17 @@
+[
+  {"dataset": "inventory", "component": "MCU chip", "days_remaining": 45, "threshold_days": 30},
+  {"dataset": "inventory", "component": "lithium battery pack", "days_remaining": 12, "threshold_days": 10},
+  {"dataset": "inventory", "component": "camera module", "days_remaining": 28, "threshold_days": 14},
+  {"dataset": "inventory", "component": "carbon frame", "days_remaining": 35, "threshold_days": 21},
+
+  {"dataset": "production_plan", "month": "2026-07", "units_per_month": 200},
+
+  {"dataset": "suppliers", "component": "MCU chip", "supplier_name": "Asia MCU Primary", "supplier_type": "primary", "price_premium_pct": 0.0, "compatibility_confidence": 1.0},
+  {"dataset": "suppliers", "component": "MCU chip", "supplier_name": "Euro Silicon Backup", "supplier_type": "backup", "price_premium_pct": 0.40, "compatibility_confidence": 0.78},
+  {"dataset": "suppliers", "component": "MCU chip", "supplier_name": "Nordic Logic Backup", "supplier_type": "backup", "price_premium_pct": 0.35, "compatibility_confidence": 0.74},
+  {"dataset": "suppliers", "component": "lithium battery pack", "supplier_name": "Battery Core", "supplier_type": "primary", "price_premium_pct": 0.0, "compatibility_confidence": 1.0},
+
+  {"dataset": "purchase_orders", "po_id": "PO-001", "route": "asia-hamburg-prague", "component": "MCU chip"},
+  {"dataset": "purchase_orders", "po_id": "PO-002", "route": "asia-hamburg-prague", "component": "lithium battery pack"},
+  {"dataset": "purchase_orders", "po_id": "PO-003", "route": "asia-hamburg-prague", "component": "camera module"}
+]

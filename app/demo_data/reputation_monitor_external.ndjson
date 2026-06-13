@@ -1,0 +1,15 @@
+{"dataset":"reviews","location_id":"vinohrady","period":"baseline","sentiment_score":0.79,"topics":["coffee quality"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"vinohrady","period":"baseline","sentiment_score":0.78,"topics":["friendly staff"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"vinohrady","period":"recent","sentiment_score":0.54,"topics":["slow service","queue"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"vinohrady","period":"recent","sentiment_score":0.56,"topics":["slow service","wait"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"wenceslas","period":"baseline","sentiment_score":0.77,"topics":["busy"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"wenceslas","period":"recent","sentiment_score":0.68,"topics":["queue","morning rush"],"time_bucket":"morning"}
+{"dataset":"reviews","location_id":"karlin","period":"baseline","sentiment_score":0.76,"topics":["good service"],"time_bucket":"afternoon"}
+{"dataset":"reviews","location_id":"karlin","period":"recent","sentiment_score":0.75,"topics":["consistent"],"time_bucket":"afternoon"}
+{"dataset":"reviews","location_id":"letna","period":"baseline","sentiment_score":0.75,"topics":["pleasant"],"time_bucket":"afternoon"}
+{"dataset":"reviews","location_id":"letna","period":"recent","sentiment_score":0.74,"topics":["normal"],"time_bucket":"afternoon"}
+{"dataset":"competitor_prices","competitor_name":"Bean House","product":"flat white","price_before":80,"price_after":68,"distance_km":0.4}
+{"dataset":"competitor_prices","competitor_name":"Brew Yard","product":"cappuccino","price_before":78,"price_after":74,"distance_km":0.8}
+{"dataset":"competitor_promotions","competitor_name":"North Cup","promotion_type":"seasonal_menu","detail":"summer espresso tonic"}
+{"dataset":"menu_trends","trend":"oat milk","baseline_mentions":8,"recent_mentions":10}
+{"dataset":"menu_trends","trend":"matcha","baseline_mentions":5,"recent_mentions":6}

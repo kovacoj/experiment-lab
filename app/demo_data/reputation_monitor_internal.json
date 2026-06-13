@@ -1,0 +1,29 @@
+[
+  {"dataset": "locations", "location_id": "vinohrady", "location_name": "Miners Vinohrady"},
+  {"dataset": "locations", "location_id": "wenceslas", "location_name": "Miners Wenceslas"},
+  {"dataset": "locations", "location_id": "karlin", "location_name": "Miners Karlin"},
+  {"dataset": "locations", "location_id": "letna", "location_name": "Miners Letna"},
+
+  {"dataset": "revenue", "location_id": "vinohrady", "period": "baseline", "revenue_index": 100},
+  {"dataset": "revenue", "location_id": "vinohrady", "period": "recent", "revenue_index": 93},
+  {"dataset": "revenue", "location_id": "wenceslas", "period": "baseline", "revenue_index": 100},
+  {"dataset": "revenue", "location_id": "wenceslas", "period": "recent", "revenue_index": 101},
+  {"dataset": "revenue", "location_id": "karlin", "period": "baseline", "revenue_index": 100},
+  {"dataset": "revenue", "location_id": "karlin", "period": "recent", "revenue_index": 102},
+  {"dataset": "revenue", "location_id": "letna", "period": "baseline", "revenue_index": 100},
+  {"dataset": "revenue", "location_id": "letna", "period": "recent", "revenue_index": 101},
+
+  {"dataset": "transactions_by_hour", "location_id": "wenceslas", "hour": 8, "transactions": 96},
+  {"dataset": "transactions_by_hour", "location_id": "wenceslas", "hour": 9, "transactions": 84},
+  {"dataset": "transactions_by_hour", "location_id": "vinohrady", "hour": 8, "transactions": 52},
+  {"dataset": "transactions_by_hour", "location_id": "karlin", "hour": 8, "transactions": 40},
+  {"dataset": "transactions_by_hour", "location_id": "letna", "hour": 8, "transactions": 36},
+
+  {"dataset": "staff_schedule", "location_id": "wenceslas", "hour": 8, "staff_count": 3},
+  {"dataset": "staff_schedule", "location_id": "wenceslas", "hour": 9, "staff_count": 4},
+  {"dataset": "staff_schedule", "location_id": "vinohrady", "hour": 8, "staff_count": 3},
+  {"dataset": "staff_schedule", "location_id": "karlin", "hour": 8, "staff_count": 3},
+
+  {"dataset": "own_prices", "product": "flat white", "price": 89},
+  {"dataset": "own_prices", "product": "cappuccino", "price": 79}
+]
