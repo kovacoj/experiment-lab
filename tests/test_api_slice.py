@@ -109,3 +109,46 @@ def test_unknown_chart_id_returns_404(client: TestClient) -> None:
     client.post("/sessions/demo_miners/refresh")
     response = client.get("/sessions/demo_miners/charts/no_such_chart/data")
     assert response.status_code == 404
+
+
+def test_bundle_rebuild_writes_expected_files(client: TestClient, tmp_path) -> None:
+    """POST /sessions/{id}/bundle/rebuild regenerates the static dashboard bundle.
+
+    The bundle lives at base_dir().parent / "bundle" so a single
+    EXPERIMENT_LAB_API_TMP_DIR override relocates it for tests.
+    """
+    session_id = "demo_miners"
+    response = client.post(f"/sessions/{session_id}/bundle/rebuild")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["bundle_dir"].endswith("/_bundle")
+    expected = {
+        "dashboard_payload.json",
+        "chart_specs.json",
+        "finding_cards.json",
+        "explanation_cards.json",
+        "prediction_payload.json",
+        "reports.json",
+        "seed_metadata.json",
+        "lovable_prompt.md",
+    }
+    assert expected.issubset(set(body["files"]))
+
+    bundle_dir = tmp_path / "_bundle"
+    for name in expected:
+        assert (bundle_dir / name).exists(), f"missing bundle file: {name}"
+
+    # The bundle is served as a static mount, so the dashboard_payload.json
+    # must be retrievable over HTTP at /bundle/<name>.
+    served = client.get("/bundle/dashboard_payload.json")
+    assert served.status_code == 200
+    payload = served.json()
+    assert "business" in payload
+    assert "kpis" in payload
+    assert "locations" in payload
+
+
+def test_root_redirects_to_ui(client: TestClient) -> None:
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code in (302, 307)
+    assert response.headers["location"] == "/ui/"

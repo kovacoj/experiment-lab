@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Signal Foundry - Reputation Monitor (PoC)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #131a2a;
+    --panel-2: #1a2236;
+    --border: #243149;
+    --text: #e6edf7;
+    --muted: #8da0bf;
+    --accent: #5b8def;
+    --good: #4ade80;
+    --watch: #fbbf24;
+    --warning: #f87171;
+    --info: #93c5fd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+  }
+  aside h1 {
+    font-size: 16px;
+    margin: 0 0 4px 0;
+    letter-spacing: 0.02em;
+  }
+  aside .subtle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  aside nav a {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  aside nav a:hover { background: var(--panel-2); }
+  aside nav a.active { background: var(--accent); color: white; }
+  main { padding: 24px 28px; max-width: 1200px; }
+  header.bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  header.bar h2 { margin: 0; font-size: 18px; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  button.primary {
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button.primary[disabled] { opacity: 0.55; cursor: progress; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi .value { font-size: 22px; font-weight: 600; margin: 6px 0; }
+  .kpi .delta { font-size: 12px; }
+  .status-good { color: var(--good); }
+  .status-watch { color: var(--watch); }
+  .status-warning { color: var(--warning); }
+  .status-info { color: var(--info); }
+  .panel-title { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .alert {
+    background: linear-gradient(135deg, rgba(248,113,113,0.08), rgba(91,141,239,0.05));
+    border: 1px solid rgba(248,113,113,0.4);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .alert h3 { margin: 0 0 4px 0; font-size: 16px; }
+  .alert .why { color: var(--muted); margin: 6px 0 12px; }
+  .alert ul { margin: 8px 0 0 16px; color: var(--muted); }
+  .columns-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+  tr:last-child td { border-bottom: 0; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: var(--panel-2); color: var(--muted); font-size: 11px;
+  }
+  .badge.selected { background: rgba(74,222,128,0.15); color: var(--good); }
+  .badge.warning { background: rgba(251,191,36,0.15); color: var(--watch); }
+  .badge.hidden, .badge.suppressed { background: rgba(141,160,191,0.12); color: var(--muted); }
+  details { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 12px; }
+  details > summary { cursor: pointer; color: var(--muted); font-weight: 500; }
+  .chart-wrap { position: relative; height: 260px; }
+  .finding { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .finding.suppressed { opacity: 0.85; }
+  .finding h4 { margin: 0 0 4px 0; font-size: 14px; }
+  .finding .meta-line { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .evidence { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 16px; font-size: 12px; color: var(--muted); }
+  .report { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-bottom: 10px; }
+  .report h4 { margin: 0 0 6px 0; }
+  .report h5 { margin: 10px 0 2px 0; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .interpretation { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  section.hidden { display: none; }
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 6px; color: var(--text);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(8px); transition: all 0.2s ease;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .pulse { animation: pulse 1s ease-in-out; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(91,141,239,0.4); }
+    100% { box-shadow: 0 0 0 12px rgba(91,141,239,0); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Signal Foundry</h1>
+    <div class="subtle">Reputation Monitor (PoC)</div>
+    <nav id="nav">
+      <a href="#overview" class="active" data-section="overview">Overview</a>
+      <a href="#alerts" data-section="alerts">Alerts</a>
+      <a href="#locations" data-section="locations">Locations</a>
+      <a href="#predictions" data-section="predictions">Predictions</a>
+      <a href="#labs" data-section="labs">Research Labs</a>
+      <a href="#findings" data-section="findings">Findings</a>
+      <a href="#explanations" data-section="explanations">Why &amp; How</a>
+      <a href="#reports" data-section="reports">Reports</a>
+    </nav>
+  </aside>
+  <main>
+    <header class="bar">
+      <div>
+        <h2 id="page-title">Overview</h2>
+        <div class="meta" id="meta-line">Loading...</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="meta" id="poll-indicator">live polling every 5s</span>
+        <button class="primary" id="refresh-btn">Refresh now</button>
+      </div>
+    </header>
+
+    <!-- OVERVIEW -->
+    <section id="section-overview">
+      <div class="kpi-row" id="kpi-row"></div>
+      <div class="card" id="headline-alert"></div>
+      <div class="card" style="margin-top: 14px;">
+        <div class="panel-title">Live sentiment per location</div>
+        <div class="chart-wrap"><canvas id="chart-live"></canvas></div>
+        <div class="interpretation" id="chart-live-interp"></div>
+      </div>
+      <div class="grid-2" style="margin-top: 14px;">
+        <div class="card">
+          <div class="panel-title">Sentiment ranking</div>
+          <div class="chart-wrap"><canvas id="chart-ranking"></canvas></div>
+          <div class="interpretation">Recent vs baseline mean sentiment for every monitored location.</div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Recovery forecast</div>
+          <div class="chart-wrap"><canvas id="chart-recovery"></canvas></div>
+          <div class="interpretation">Predicted sentiment trajectory for the focus location with and without the staffing action.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section id="section-alerts" class="hidden">
+      <div id="alerts-list"></div>
+    </section>
+
+    <!-- LOCATIONS -->
+    <section id="section-locations" class="hidden">
+      <div class="card">
+        <div class="panel-title">Locations</div>
+        <table id="locations-table">
+          <thead><tr>
+            <th>Location</th><th>Recent</th><th>Baseline</th><th>Drop</th>
+            <th>Recent reviews</th><th>Status</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PREDICTIONS -->
+    <section id="section-predictions" class="hidden">
+      <div class="grid-2">
+        <div class="card">
+          <div class="panel-title">Sentiment recovery scenarios</div>
+          <div class="chart-wrap"><canvas id="chart-pred-sentiment"></canvas></div>
+          <div class="interpretation">Action scenario closes the gap to baseline in ~5 days; no-action drifts back over ~14.</div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Morning queue pressure</div>
+          <div class="chart-wrap"><canvas id="chart-pred-queue"></canvas></div>
+          <div class="interpretation">8 AM queue-pressure index with and without the staffing action.</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top: 14px;">
+        <div class="card" id="pred-staffing"></div>
+        <div class="card" id="pred-competitor"></div>
+      </div>
+    </section>
+
+    <!-- LABS -->
+    <section id="section-labs" class="hidden">
+      <div class="card">
+        <div class="panel-title">Active labs</div>
+        <div id="labs-active"></div>
+      </div>
+      <details open style="margin-top: 12px;">
+        <summary>Suppressed weak signals</summary>
+        <div id="labs-suppressed" style="margin-top: 10px;"></div>
+      </details>
+    </section>
+
+    <!-- FINDINGS -->
+    <section id="section-findings" class="hidden">
+      <div id="findings-active"></div>
+      <details open style="margin-top: 12px;">
+        <summary>Suppressed findings</summary>
+        <div id="findings-suppressed" style="margin-top: 10px;"></div>
+      </details>
+    </section>
+
+    <!-- EXPLANATIONS -->
+    <section id="section-explanations" class="hidden">
+      <div id="explanations-list"></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="section-reports" class="hidden">
+      <div id="reports-list"></div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BACKEND = ""; // same-origin via /ui mount
+const SESSION = "demo_miners";
+const CHART_ID = "sentiment_trend_by_location";
+let bundle = null;
+let liveChart = null;
+let rankingChart = null;
+let recoveryChart = null;
+let predSentimentChart = null;
+let predQueueChart = null;
+
+function toast(msg, ms = 2200) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), ms);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(BACKEND + path, opts);
+  if (!r.ok) throw new Error(`${path} -> HTTP ${r.status}`);
+  const ct = r.headers.get("content-type") || "";
+  return ct.includes("application/json") ? r.json() : r.text();
+}
+
+function colorFor(i) {
+  const palette = ["#5b8def", "#4ade80", "#fbbf24", "#f87171", "#a78bfa", "#22d3ee", "#f472b6"];
+  return palette[i % palette.length];
+}
+
+function statusClass(s) { return "status-" + (s || "info"); }
+function pct(n) { return (n == null) ? "-" : (Math.round(n * 1000) / 10) + "%"; }
+
+// ---------------------------------------------------------------------------
+// Navigation
+
+document.querySelectorAll("#nav a").forEach((a) => {
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const target = a.dataset.section;
+    document.querySelectorAll("#nav a").forEach((x) => x.classList.remove("active"));
+    a.classList.add("active");
+    document.querySelectorAll("main section").forEach((s) => s.classList.add("hidden"));
+    document.getElementById("section-" + target).classList.remove("hidden");
+    document.getElementById("page-title").textContent = a.textContent;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Renderers
+
+function renderKpis() {
+  const row = document.getElementById("kpi-row");
+  row.innerHTML = "";
+  (bundle.kpis || []).forEach((k) => {
+    row.insertAdjacentHTML("beforeend", `
+      <div class="card kpi">
+        <div class="label">${k.label}</div>
+        <div class="value">${k.value}</div>
+        <div class="delta ${statusClass(k.status)}">${k.delta || ""}</div>
+      </div>
+    `);
+  });
+}
+
+function renderHeadlineAlert() {
+  const el = document.getElementById("headline-alert");
+  const a = (bundle.alerts || [])[0];
+  if (!a) { el.innerHTML = `<div class="meta">No active alerts.</div>`; return; }
+  el.outerHTML = `
+    <div class="alert pulse" id="headline-alert">
+      <h3>${a.title}</h3>
+      <div class="why">${a.summary || ""}</div>
+      <div><strong>Likely cause:</strong> ${a.likely_cause || "-"}</div>
+      <div><strong>Recommended action:</strong> ${a.recommended_action || "-"}</div>
+      <div class="meta">Confidence: ${pct(a.confidence)} &middot; Location: ${a.location_name || "-"}</div>
+      ${a.evidence && a.evidence.length ? `<ul>${a.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+    </div>
+  `;
+}
+
+function renderAlertsList() {
+  const el = document.getElementById("alerts-list");
+  if (!bundle.alerts || !bundle.alerts.length) {
+    el.innerHTML = `<div class="card meta">No active alerts.</div>`; return;
+  }
+  el.innerHTML = bundle.alerts.map((a) => `
+    <div class="card" style="margin-bottom: 12px;">
+      <h3 style="margin:0 0 4px 0;">${a.title}</h3>
+      <div class="meta">${new Date(a.created_at).toLocaleString()} &middot; ${a.location_name} &middot; confidence ${pct(a.confidence)}</div>
+      <p>${a.summary || ""}</p>
+      <div><strong>Likely cause:</strong> ${a.likely_cause || "-"}</div>
+      <div><strong>Recommended action:</strong> ${a.recommended_action || "-"}</div>
+      ${a.evidence && a.evidence.length ? `<ul>${a.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+    </div>
+  `).join("");
+}
+
+function renderLocations() {
+  const tbody = document.querySelector("#locations-table tbody");
+  tbody.innerHTML = (bundle.locations || []).map((l) => `
+    <tr>
+      <td>${l.location_name}</td>
+      <td>${l.recent_sentiment ?? "-"}</td>
+      <td>${l.baseline_sentiment ?? "-"}</td>
+      <td class="${l.sentiment_drop_pct >= 0.15 ? "status-warning" : "status-good"}">${pct(l.sentiment_drop_pct)}</td>
+      <td>${l.recent_review_count}</td>
+      <td><span class="badge ${l.status}">${l.status}</span></td>
+    </tr>
+  `).join("");
+}
+
+function renderLabs() {
+  const active = (bundle.labs || []).filter((l) => l.frontend_visibility === "active");
+  const suppressed = (bundle.labs || []).filter((l) => l.frontend_visibility === "suppressed");
+  const card = (l) => `
+    <div class="finding ${l.frontend_visibility}">
+      <h4>${l.lab_name} <span class="badge ${l.status}">${l.status}</span></h4>
+      <div class="meta-line">score ${l.score} &middot; confidence ${l.confidence}</div>
+      <div>${l.summary || ""}</div>
+      ${l.recommended_actions && l.recommended_actions.length ? `<div style="margin-top:6px;"><strong>Action:</strong> ${l.recommended_actions[0].detail}</div>` : ""}
+      ${l.limitations && l.limitations.length ? `<div class="meta" style="margin-top:6px;"><em>Caveat:</em> ${l.limitations[0]}</div>` : ""}
+    </div>
+  `;
+  document.getElementById("labs-active").innerHTML = active.map(card).join("") || `<div class="meta">No active labs.</div>`;
+  document.getElementById("labs-suppressed").innerHTML = suppressed.map(card).join("") || `<div class="meta">No suppressed labs.</div>`;
+}
+
+function renderFindings() {
+  const active = (bundle.findings || []).filter((f) => f.frontend_visibility === "active");
+  const suppressed = (bundle.findings || []).filter((f) => f.frontend_visibility === "suppressed");
+  const card = (f) => `
+    <div class="finding ${f.frontend_visibility}">
+      <h4>${f.title} <span class="badge ${f.severity}">${f.severity}</span></h4>
+      <div class="meta-line">${f.finding_id} &middot; ${f.lab_id} &middot; confidence ${f.confidence ?? "-"}</div>
+      <div><strong>What was found:</strong> ${f.what_was_found || ""}</div>
+      <div style="margin-top:4px;"><strong>Why it matters:</strong> ${f.why_it_matters || ""}</div>
+      ${f.recommended_action ? `<div style="margin-top:4px;"><strong>Recommended action:</strong> ${f.recommended_action}</div>` : ""}
+      ${f.evidence && f.evidence.length ? `
+        <div style="margin-top:8px;"><strong>Evidence:</strong>
+          <div class="evidence">${f.evidence.map((e) => `<div>${e.label}: <span class="meta">${e.value ?? ""}${e.detail ? " &mdash; " + e.detail : ""}</span></div>`).join("")}</div>
+        </div>` : ""}
+      ${f.why_suppressed ? `<div class="meta" style="margin-top:6px;"><em>Suppressed because:</em> ${f.why_suppressed}</div>` : ""}
+    </div>
+  `;
+  document.getElementById("findings-active").innerHTML = active.map(card).join("") || `<div class="meta">No active findings.</div>`;
+  document.getElementById("findings-suppressed").innerHTML = suppressed.map(card).join("") || `<div class="meta">No suppressed findings.</div>`;
+}
+
+function renderExplanations() {
+  const el = document.getElementById("explanations-list");
+  el.innerHTML = (bundle.explanations || []).map((e) => `
+    <div class="card" style="margin-bottom: 10px;">
+      <h4 style="margin:0 0 4px 0;">${e.title}</h4>
+      <div class="meta-line">confidence ${e.confidence ?? "-"}</div>
+      <div>${e.plain_language}</div>
+      <details style="margin-top: 8px; background: transparent; border: 0; padding: 0;">
+        <summary>Technical detail</summary>
+        <div style="margin-top: 6px;">${e.technical_detail}</div>
+      </details>
+    </div>
+  `).join("");
+}
+
+function renderReports() {
+  fetch(BACKEND + "/bundle/reports.json").then((r) => r.json()).then((data) => {
+    const el = document.getElementById("reports-list");
+    el.innerHTML = (data.reports || []).map((r) => `
+      <div class="report">
+        <h4>${r.title}</h4>
+        <div class="meta-line">${r.type} &middot; ${r.report_id}</div>
+        <p>${r.summary}</p>
+        ${(r.sections || []).map((s) => `<h5>${s.heading}</h5><div>${s.body}</div>`).join("")}
+      </div>
+    `).join("");
+  });
+}
+
+function renderPredictionsExtras() {
+  const s = (bundle.predictions || {}).staffing_action || {};
+  const c = (bundle.predictions || {}).competitor_impact || {};
+  document.getElementById("pred-staffing").innerHTML = `
+    <div class="panel-title">Staffing action forecast</div>
+    <div><strong>${s.action || "-"}</strong></div>
+    <div class="meta">at ${s.location_name || "-"}</div>
+    <ul>
+      <li>Queue pressure reduction: ${pct(s.expected_queue_pressure_reduction_pct)}</li>
+      <li>Wait-time reduction: ${s.expected_wait_time_reduction_min ?? "-"} min</li>
+      <li>Sentiment recovery: ~${s.expected_sentiment_recovery_days ?? "-"} days</li>
+      <li>Complaint reduction: ${pct(s.expected_complaint_reduction_pct)}</li>
+      <li>Confidence: ${pct(s.confidence)}</li>
+    </ul>
+  `;
+  document.getElementById("pred-competitor").innerHTML = `
+    <div class="panel-title">Competitor impact</div>
+    <div><strong>${c.detected_move || "-"}</strong></div>
+    <div class="meta">vs ${c.location_name || "-"}</div>
+    <ul>
+      <li>Estimated revenue risk: ${pct(c.estimated_revenue_risk_pct)}</li>
+      <li>Confidence: ${pct(c.confidence)}</li>
+    </ul>
+    <div class="interpretation">${c.interpretation || ""}</div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Charts
+
+function rankingChartData() {
+  const labels = (bundle.locations || []).map((l) => l.location_name);
+  return {
+    labels,
+    datasets: [
+      { label: "Baseline", data: (bundle.locations || []).map((l) => l.baseline_sentiment), backgroundColor: "#243149" },
+      { label: "Recent",   data: (bundle.locations || []).map((l) => l.recent_sentiment),   backgroundColor: "#5b8def" },
+    ],
+  };
+}
+function recoveryChartData() {
+  const rec = (bundle.predictions || {}).sentiment_recovery || [];
+  return {
+    labels: rec.map((r) => r.date.slice(5)),
+    datasets: [
+      { label: "No action",    data: rec.map((r) => r.predicted_sentiment_no_action),         borderColor: "#f87171", backgroundColor: "transparent" },
+      { label: "Extra staff",  data: rec.map((r) => r.predicted_sentiment_with_extra_staff),  borderColor: "#4ade80", backgroundColor: "transparent" },
+    ],
+  };
+}
+function queueChartData() {
+  const q = (bundle.predictions || {}).queue_pressure || [];
+  return {
+    labels: q.map((r) => r.date.slice(5)),
+    datasets: [
+      { label: "No action",   data: q.map((r) => r.predicted_queue_pressure_no_action),       backgroundColor: "#f87171" },
+      { label: "Extra staff", data: q.map((r) => r.predicted_queue_pressure_with_extra_staff), backgroundColor: "#4ade80" },
+    ],
+  };
+}
+
+const baseLineOpts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: "#e6edf7" } } },
+  scales: {
+    x: { ticks: { color: "#8da0bf" }, grid: { color: "rgba(141,160,191,0.1)" } },
+    y: { ticks: { color: "#8da0bf" }, grid: { color: "rgba(141,160,191,0.1)" } },
+  },
+};
+
+function buildStaticCharts() {
+  if (rankingChart) rankingChart.destroy();
+  rankingChart = new Chart(document.getElementById("chart-ranking"), { type: "bar", data: rankingChartData(), options: baseLineOpts });
+  if (recoveryChart) recoveryChart.destroy();
+  recoveryChart = new Chart(document.getElementById("chart-recovery"), { type: "line", data: recoveryChartData(), options: baseLineOpts });
+  if (predSentimentChart) predSentimentChart.destroy();
+  predSentimentChart = new Chart(document.getElementById("chart-pred-sentiment"), { type: "line", data: recoveryChartData(), options: baseLineOpts });
+  if (predQueueChart) predQueueChart.destroy();
+  predQueueChart = new Chart(document.getElementById("chart-pred-queue"), { type: "bar", data: queueChartData(), options: baseLineOpts });
+}
+
+// Live chart: polls /sessions/.../charts/.../data
+async function refreshLiveChart() {
+  try {
+    const data = await api(`/sessions/${SESSION}/charts/${CHART_ID}/data?limit=200`);
+    const points = data.data || [];
+    const labels = points.map((p) => new Date(p.time).toLocaleTimeString());
+    const seriesKeys = Array.from(new Set(points.flatMap((p) => Object.keys(p).filter((k) => k !== "time"))));
+    const datasets = seriesKeys.map((k, i) => ({
+      label: k.replace("_sentiment", "").replace(/_/g, " "),
+      data: points.map((p) => p[k] ?? null),
+      borderColor: colorFor(i),
+      backgroundColor: "transparent",
+      tension: 0.25,
+    }));
+    if (!liveChart) {
+      liveChart = new Chart(document.getElementById("chart-live"), { type: "line", data: { labels, datasets }, options: baseLineOpts });
+    } else {
+      liveChart.data.labels = labels;
+      liveChart.data.datasets = datasets;
+      liveChart.update("none");
+    }
+    document.getElementById("chart-live-interp").textContent =
+      `Live: ${points.length} refresh point(s) so far. Each point is one /refresh of the lab pipeline.`;
+  } catch (e) {
+    document.getElementById("chart-live-interp").innerHTML = `<span class="status-warning">live data unavailable: ${e.message}</span>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bundle load + refresh action
+
+async function loadBundle() {
+  bundle = await api("/bundle/dashboard_payload.json");
+  document.getElementById("meta-line").textContent =
+    `${bundle.business?.name || ""} - generated ${new Date(bundle.meta?.generated_at).toLocaleString()}`;
+  renderKpis();
+  renderHeadlineAlert();
+  renderAlertsList();
+  renderLocations();
+  renderLabs();
+  renderFindings();
+  renderExplanations();
+  renderPredictionsExtras();
+  buildStaticCharts();
+  renderReports();
+}
+
+async function ensureBundle() {
+  try { await loadBundle(); }
+  catch (e) {
+    // Bundle hasn't been built yet -> ask backend to build, then retry.
+    await api(`/sessions/${SESSION}/bundle/rebuild`, { method: "POST" });
+    await loadBundle();
+  }
+}
+
+async function doRefresh() {
+  const btn = document.getElementById("refresh-btn");
+  btn.disabled = true; btn.textContent = "Refreshing...";
+  try {
+    const resp = await api(`/sessions/${SESSION}/refresh`, { method: "POST" });
+    toast(`Refresh OK: ${resp.models?.length || 0} models, prediction_changed=${resp.prediction_changed}`);
+    await api(`/sessions/${SESSION}/bundle/rebuild`, { method: "POST" });
+    await loadBundle();
+    await refreshLiveChart();
+  } catch (e) {
+    toast("Refresh failed: " + e.message, 4000);
+  } finally {
+    btn.disabled = false; btn.textContent = "Refresh now";
+  }
+}
+
+document.getElementById("refresh-btn").addEventListener("click", doRefresh);
+
+// Boot
+(async () => {
+  await ensureBundle();
+  await refreshLiveChart();
+  setInterval(refreshLiveChart, 5000);
+})();
+</script>
+</body>
+</html>

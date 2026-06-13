@@ -7,15 +7,23 @@ Routes:
   GET  /sessions/{session_id}/monitoring-plan
   GET  /sessions/{session_id}/dashboard
   GET  /sessions/{session_id}/charts/{chart_id}/data
+  POST /sessions/{session_id}/bundle/rebuild
+  GET  /bundle/{filename}   (static mount, populated by /bundle/rebuild)
+  GET  /ui/                  (static dashboard)
 
 Out of scope for this slice: alerts (POST/GET), supply_chain session,
 multiple charts, anomaly detection, decision card generation.
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.dashboard_spec import CHART_SENTIMENT_TREND, build_dashboard_spec
 from app.api.history_store import read_metric_series
@@ -31,7 +39,27 @@ from app.api.schemas import (
 )
 from app.api.sentiment_metrics import location_sentiment_snapshot
 from app.api.sessions import get_session
+from app.api.storage import base_dir
+from app.export.frontend_bundle import build_bundle
 from app.labs.runner import load_demo_context, prepare_context_for_labs
+
+# ---------------------------------------------------------------------------
+# Static UI + bundle directories
+#
+# The bundle lives under the on-disk session-state root so a single
+# EXPERIMENT_LAB_API_TMP_DIR override relocates everything for tests.
+# `base_dir()` is `tmp/sessions/` in production; placing the bundle under it
+# keeps tests hermetic and avoids escaping the env-overridden root.
+
+def _bundle_dir() -> Path:
+    return base_dir() / "_bundle"
+
+
+def _static_ui_dir() -> Path:
+    # Ship the static dashboard alongside the package so editable installs
+    # and Docker images both find it.
+    return Path(__file__).resolve().parent.parent / "static"
+
 
 app = FastAPI(
     title="Signal Foundry Backend (slice)",
@@ -39,8 +67,23 @@ app = FastAPI(
         "Vertical slice: session demo_miners / reputation_monitor / "
         "chart sentiment_trend_by_location."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
+
+# CORS: the static dashboard ships under /ui on the same origin, but we also
+# accept any localhost origin so the same dashboard can be opened from
+# `python -m http.server` on a different port during development.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_static_ui = _static_ui_dir()
+if _static_ui.exists():
+    app.mount("/ui", StaticFiles(directory=_static_ui, html=True), name="ui")
 
 
 def _resolve_session(session_id: str):
@@ -48,6 +91,12 @@ def _resolve_session(session_id: str):
         return get_session(session_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"unknown session_id: {session_id}") from exc
+
+
+@app.get("/")
+def index() -> RedirectResponse:
+    """Convenience redirect to the static dashboard."""
+    return RedirectResponse(url="/ui/")
 
 
 @app.get("/health")
@@ -115,3 +164,26 @@ def get_chart_data(session_id: str, chart_id: str, limit: int = 200) -> ChartDat
         raise HTTPException(status_code=404, detail=f"unknown chart_id: {chart_id}")
     points: list[dict[str, Any]] = read_metric_series(session_id, chart_id, limit=limit)
     return ChartDataResponse(chart_id=chart_id, data=points)
+
+
+@app.post("/sessions/{session_id}/bundle/rebuild")
+def post_rebuild_bundle(session_id: str) -> dict[str, Any]:
+    """Regenerate the static frontend bundle under /bundle/.
+
+    The dashboard calls this after a refresh so its non-live panels
+    (findings, labs, predictions, reports) reflect the freshest run.
+    """
+    _resolve_session(session_id)
+    backend_url = os.environ.get("SIGNAL_FOUNDRY_PUBLIC_URL", "")
+    written = build_bundle(_bundle_dir(), live_backend_url=backend_url or None)
+    return {
+        "bundle_dir": str(_bundle_dir()),
+        "files": sorted(written.keys()),
+    }
+
+
+# Mount the bundle dir as a static path. It may not exist on first boot;
+# create it empty so the mount succeeds.
+_bundle = _bundle_dir()
+_bundle.mkdir(parents=True, exist_ok=True)
+app.mount("/bundle", StaticFiles(directory=_bundle, html=False), name="bundle")
