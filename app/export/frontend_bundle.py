@@ -10,7 +10,7 @@ edits, no new lab code) and emits:
     explanation_cards.json     - short UI cards for the model story
     prediction_payload.json    - scenario A (no action) vs B (extra staff)
     reports.json               - daily brief / incident / lab decision report
-    lovable_prompt.md          - the Lovable handoff prompt
+    frontend_handoff_prompt.md - the frontend handoff prompt
     seed_metadata.json         - how this bundle was built
 
 All numbers are derived from the lab outputs and signal aggregations;
@@ -683,7 +683,7 @@ def _reports(findings: list[dict[str, Any]], focus: dict[str, Any], cards) -> di
     return {"reports": reports}
 
 
-def _lovable_prompt(focus: dict[str, Any]) -> str:
+def _frontend_handoff_prompt(focus: dict[str, Any]) -> str:
     name = focus.get("location_name", "the focus location")
     drop = _percent(-(focus.get("sentiment_drop_pct") or 0))
     return f"""Build a polished React + TypeScript B2B SaaS dashboard for Signal Foundry.
@@ -831,9 +831,9 @@ def build_bundle(
         path.write_text(json.dumps(payload, indent=2, default=str))
         written[name] = path
 
-    prompt_path = out_dir / "lovable_prompt.md"
-    prompt_path.write_text(_lovable_prompt(focus))
-    written["lovable_prompt.md"] = prompt_path
+    prompt_path = out_dir / "frontend_handoff_prompt.md"
+    prompt_path.write_text(_frontend_handoff_prompt(focus))
+    written["frontend_handoff_prompt.md"] = prompt_path
     return written
 
 

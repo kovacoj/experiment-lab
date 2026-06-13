@@ -134,7 +134,7 @@ def test_bundle_rebuild_writes_expected_files(client: TestClient, tmp_path) -> N
         "prediction_payload.json",
         "reports.json",
         "seed_metadata.json",
-        "lovable_prompt.md",
+        "frontend_handoff_prompt.md",
     }
     assert expected.issubset(set(body["files"]))
 
