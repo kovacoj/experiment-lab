@@ -50,6 +50,21 @@ python -m app.labs.runner --scenario reputation_monitor
 python -m app.labs.runner --scenario supply_chain_risk
 ```
 
+## Experiment Lab Skill
+
+Use the stable local skill wrapper when an agent or developer needs structured machine output instead of importing internal modules directly.
+
+Core commands:
+
+```bash
+uv run python -m app.agent_skills.experiment_lab_cli list-scenarios
+uv run python -m app.agent_skills.experiment_lab_cli list-labs --scenario reputation_monitor
+uv run python -m app.agent_skills.experiment_lab_cli run-analysis --scenario reputation_monitor --format json
+uv run python -m app.agent_skills.experiment_lab_cli refresh-compare --scenario supply_chain_risk --format json
+```
+
+External integrations such as Apify, Hugging Face, and n8n are intentionally out of scope for this skill and should be handled by MCP or other orchestration layers separately.
+
 List the available labs for one scenario:
 
 ```bash

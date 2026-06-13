@@ -1,0 +1,32 @@
+{
+  "scenario": "reputation_monitor",
+  "status": "ok",
+  "lab_run_report": {
+    "selected": [
+      {"lab_id": "location_sentiment"},
+      {"lab_id": "competitor_price"},
+      {"lab_id": "peak_hours"}
+    ],
+    "warning": [
+      {"lab_id": "reputation_data_quality"}
+    ],
+    "hidden": [
+      {"lab_id": "menu_trend"},
+      {"lab_id": "staff_mention"}
+    ],
+    "discarded": [],
+    "failed": []
+  },
+  "decision_cards": [
+    {"card_id": "reputation_operational_risk"},
+    {"card_id": "card-competitor_price"}
+  ],
+  "alert_candidates": [
+    {"card_id": "reputation_operational_risk"}
+  ],
+  "metadata": {
+    "data_mode": "demo_fixture",
+    "external_mode": "cached",
+    "hf_mode": "off"
+  }
+}

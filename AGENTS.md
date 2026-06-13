@@ -25,6 +25,7 @@
 
 ## Agent Rules
 - Default autonomous changes to `app/labs/`, `app/text_engine/`, `app/demo_data/`, and `tests/`.
+- Prefer the stable wrapper `python -m app.agent_skills.experiment_lab_cli ...` when acting as an agent consumer of the lab engine. Do not import random lab modules directly unless you are editing the implementation.
 - Keep the current scope narrow: labs package, fixtures, runner, critic, and tests. Do not add frontend, n8n workflows, live Apify connectors, authentication, database code, or arbitrary orchestration layers unless the human explicitly asks.
 - Preserve the shared concepts in the lab contracts: lab identity, scenario identity, hypothesis, status, score, confidence, summary, evidence, recommended actions, limitations, and monitoring rules.
 - Keep the two current scenarios wired through `LAB_REGISTRY`: `reputation_monitor` and `supply_chain_risk`.

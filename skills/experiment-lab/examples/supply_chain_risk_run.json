@@ -1,0 +1,33 @@
+{
+  "scenario": "supply_chain_risk",
+  "status": "ok",
+  "lab_run_report": {
+    "selected": [
+      {"lab_id": "chip_supply"},
+      {"lab_id": "production_stop_risk"},
+      {"lab_id": "battery_cost"}
+    ],
+    "warning": [
+      {"lab_id": "supply_chain_data_quality"}
+    ],
+    "hidden": [
+      {"lab_id": "shipping_risk"},
+      {"lab_id": "alternative_supplier"},
+      {"lab_id": "geopolitical"}
+    ],
+    "discarded": [],
+    "failed": []
+  },
+  "decision_cards": [
+    {"card_id": "supply_chain_production_risk"},
+    {"card_id": "card-battery_cost"}
+  ],
+  "alert_candidates": [
+    {"card_id": "supply_chain_production_risk"}
+  ],
+  "metadata": {
+    "data_mode": "demo_fixture",
+    "external_mode": "cached",
+    "hf_mode": "off"
+  }
+}
