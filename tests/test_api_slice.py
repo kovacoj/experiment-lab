@@ -540,3 +540,23 @@ def test_forecast_surfaces_recent_user_context(client: TestClient) -> None:
     assert body["user_context"] is not None
     assert body["user_context"]["count_total"] >= 1
     assert body["user_context"]["confidence_band"] == "operator-low"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: React frontend mount at /app/
+
+def test_react_app_mount_serves_index_html(client: TestClient) -> None:
+    """The React bundle should be reachable at /app/ when present."""
+    from pathlib import Path
+    bundle = Path(__file__).resolve().parents[1] / "app" / "static_react" / "index.html"
+    if not bundle.exists():
+        import pytest  # type: ignore
+        pytest.skip("React bundle not built; run `npm run build` in frontend/")
+    response = client.get("/app/")
+    assert response.status_code == 200
+    body = response.text
+    assert "<div id=\"root\">" in body
+    # Asset paths must be subpath-correct so the bundle works mounted at /app/
+    assert "/app/assets/" in body
+    # Branding sanity: no Signal Foundry leftover in the served HTML
+    assert "Signal Foundry" not in body
