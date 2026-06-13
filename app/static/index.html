@@ -2,184 +2,397 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Signal Foundry - Reputation Monitor (PoC)</title>
+<title>0 to 100 — Reputation Monitor</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0b0f1a;
-    --panel: #131a2a;
-    --panel-2: #1a2236;
-    --border: #243149;
-    --text: #e6edf7;
-    --muted: #8da0bf;
-    --accent: #5b8def;
-    --good: #4ade80;
-    --watch: #fbbf24;
-    --warning: #f87171;
-    --info: #93c5fd;
+    /* light theme tokens */
+    --bg:           #f5f7fb;
+    --surface:      #ffffff;
+    --surface-2:    #fbfcfe;
+    --border:       #e5e9f2;
+    --border-soft:  #eef1f7;
+    --text:         #0f172a;
+    --text-muted:   #64748b;
+    --text-faint:   #94a3b8;
+    --accent:       #4f46e5;       /* indigo-600 */
+    --accent-soft:  #eef2ff;       /* indigo-50  */
+    --accent-hover: #4338ca;
+    --good:         #059669;       /* emerald-600 */
+    --good-soft:    #ecfdf5;
+    --watch:        #d97706;       /* amber-600 */
+    --watch-soft:   #fffbeb;
+    --warning:      #dc2626;       /* red-600 */
+    --warning-soft: #fef2f2;
+    --info:         #2563eb;       /* blue-600 */
+    --info-soft:    #eff6ff;
+    --shadow-sm:    0 1px 2px 0 rgba(15,23,42,0.04);
+    --shadow:       0 1px 3px 0 rgba(15,23,42,0.06), 0 1px 2px -1px rgba(15,23,42,0.06);
+    --shadow-lg:    0 10px 25px -5px rgba(15,23,42,0.08), 0 4px 10px -3px rgba(15,23,42,0.04);
+    --radius:       10px;
+    --radius-lg:    14px;
   }
+
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
     font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
   }
   a { color: var(--accent); text-decoration: none; }
-  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  a:hover { color: var(--accent-hover); }
+  .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- layout ---------- */
+  .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
   aside {
-    background: var(--panel);
+    background: var(--surface);
     border-right: 1px solid var(--border);
-    padding: 16px;
+    padding: 22px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: sticky; top: 0; height: 100vh;
   }
-  aside h1 {
-    font-size: 16px;
-    margin: 0 0 4px 0;
-    letter-spacing: 0.02em;
+  .brand {
+    display: flex; align-items: baseline; gap: 8px;
   }
-  aside .subtle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
-  aside nav a {
-    display: block;
-    padding: 8px 10px;
-    border-radius: 6px;
-    color: var(--text);
-    margin-bottom: 2px;
+  .brand .wordmark {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  aside nav a:hover { background: var(--panel-2); }
-  aside nav a.active { background: var(--accent); color: white; }
-  main { padding: 24px 28px; max-width: 1200px; }
+  .brand .arrow { color: var(--text-faint); font-weight: 500; }
+  .brand .num-100 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+  .tagline { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .nav-section { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; padding: 0 8px; margin-bottom: 6px; }
+  nav.primary { display: flex; flex-direction: column; gap: 1px; }
+  nav.primary a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    color: var(--text); font-weight: 500;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  nav.primary a:hover { background: var(--surface-2); color: var(--text); }
+  nav.primary a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav.primary a svg { width: 16px; height: 16px; stroke-width: 1.8; }
+
+  .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding: 0 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--surface-2); color: var(--text-muted);
+    border: 1px solid var(--border-soft);
+  }
+  .pill.live { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .pill.live .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--good); box-shadow: 0 0 0 0 rgba(5,150,105,0.4); animation: livepulse 2s infinite; }
+  @keyframes livepulse { 0%{box-shadow:0 0 0 0 rgba(5,150,105,0.5);} 70%{box-shadow:0 0 0 6px rgba(5,150,105,0);} 100%{box-shadow:0 0 0 0 rgba(5,150,105,0);} }
+
+  /* ---------- main ---------- */
+  main { padding: 28px 36px 60px; max-width: 1320px; }
   header.bar {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 18px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 24px; gap: 16px;
   }
-  header.bar h2 { margin: 0; font-size: 18px; }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  header.bar h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  header.bar .sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  .bar-actions { display: flex; gap: 10px; align-items: center; }
+
   button.primary {
     background: var(--accent);
     color: white;
     border: 0;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-  }
-  button.primary[disabled] { opacity: 0.55; cursor: progress; }
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
+    padding: 9px 16px;
     border-radius: 8px;
-    padding: 14px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow: var(--shadow-sm);
+    transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
+    display: inline-flex; align-items: center; gap: 8px;
   }
-  .kpi .label { color: var(--muted); font-size: 12px; }
-  .kpi .value { font-size: 22px; font-weight: 600; margin: 6px 0; }
-  .kpi .delta { font-size: 12px; }
-  .status-good { color: var(--good); }
-  .status-watch { color: var(--watch); }
-  .status-warning { color: var(--warning); }
-  .status-info { color: var(--info); }
-  .panel-title { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-  .alert {
-    background: linear-gradient(135deg, rgba(248,113,113,0.08), rgba(91,141,239,0.05));
-    border: 1px solid rgba(248,113,113,0.4);
-    border-radius: 10px;
+  button.primary:hover:not([disabled]) { background: var(--accent-hover); box-shadow: var(--shadow); }
+  button.primary:active:not([disabled]) { transform: translateY(1px); }
+  button.primary[disabled] { opacity: 0.6; cursor: progress; }
+  button.primary svg { width: 14px; height: 14px; stroke-width: 2.2; }
+  button.primary.refreshing svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 18px 20px;
-    margin-bottom: 18px;
+    box-shadow: var(--shadow-sm);
   }
-  .alert h3 { margin: 0 0 4px 0; font-size: 16px; }
-  .alert .why { color: var(--muted); margin: 6px 0 12px; }
-  .alert ul { margin: 8px 0 0 16px; color: var(--muted); }
-  .columns-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
-  tr:last-child td { border-bottom: 0; }
+  .card:hover { box-shadow: var(--shadow); transition: box-shadow 0.18s ease; }
+  .card h3 { margin: 0 0 8px 0; font-size: 15px; font-weight: 600; }
+  .panel-title { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px 0; }
+
+  /* grids */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  /* KPI */
+  .kpi .label { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+  .kpi .value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 8px 0 6px; }
+  .kpi .delta { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; }
+  .kpi.delta-good .delta { background: var(--good-soft); color: var(--good); }
+  .kpi.delta-watch .delta { background: var(--watch-soft); color: var(--watch); }
+  .kpi.delta-warning .delta { background: var(--warning-soft); color: var(--warning); }
+  .kpi.delta-info .delta { background: var(--info-soft); color: var(--info); }
+
+  /* status badges */
   .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 999px;
-    background: var(--panel-2); color: var(--muted); font-size: 11px;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--surface-2); color: var(--text-muted);
+    border: 1px solid var(--border-soft);
   }
-  .badge.selected { background: rgba(74,222,128,0.15); color: var(--good); }
-  .badge.warning { background: rgba(251,191,36,0.15); color: var(--watch); }
-  .badge.hidden, .badge.suppressed { background: rgba(141,160,191,0.12); color: var(--muted); }
-  details { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 12px; }
-  details > summary { cursor: pointer; color: var(--muted); font-weight: 500; }
-  .chart-wrap { position: relative; height: 260px; }
-  .finding { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
-  .finding.suppressed { opacity: 0.85; }
-  .finding h4 { margin: 0 0 4px 0; font-size: 14px; }
-  .finding .meta-line { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-  .evidence { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 16px; font-size: 12px; color: var(--muted); }
-  .report { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-bottom: 10px; }
-  .report h4 { margin: 0 0 6px 0; }
-  .report h5 { margin: 10px 0 2px 0; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .interpretation { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .badge.good { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .badge.watch { background: var(--watch-soft); color: var(--watch); border-color: transparent; }
+  .badge.warning { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+  .badge.info { background: var(--info-soft); color: var(--info); border-color: transparent; }
+  .badge.selected { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .badge.suppressed, .badge.hidden { background: var(--surface-2); color: var(--text-faint); }
+
+  /* alert hero */
+  .alert {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--warning-soft) 0%, var(--surface) 60%);
+    border: 1px solid var(--warning-soft);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .alert .alert-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+  .alert h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.35; max-width: 720px; }
+  .alert .why { color: var(--text-muted); margin: 4px 0 14px; font-size: 13px; }
+  .alert .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-top: 8px; }
+  .alert .meta-grid > div > .lbl { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+  .alert .meta-grid > div > .val { font-size: 13px; color: var(--text); font-weight: 500; margin-top: 2px; }
+  .alert ul { margin: 14px 0 0 0; padding-left: 18px; color: var(--text-muted); font-size: 13px; }
+  .alert ul li { margin-bottom: 3px; }
+  .alert.pulse::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit;
+    box-shadow: 0 0 0 0 rgba(220,38,38,0.35);
+    animation: alertpulse 1.6s ease-out;
+    pointer-events: none;
+  }
+  @keyframes alertpulse { from { box-shadow: 0 0 0 0 rgba(220,38,38,0.35); } to { box-shadow: 0 0 0 18px rgba(220,38,38,0); } }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; padding: 10px 12px;
+    color: var(--text-faint); font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 14px 12px; border-bottom: 1px solid var(--border-soft); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  /* findings + labs */
+  .item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow-sm); }
+  .item.suppressed { opacity: 0.78; }
+  .item h4 { margin: 0 0 6px 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .item .meta-line { color: var(--text-faint); font-size: 12px; margin-bottom: 8px; font-family: "JetBrains Mono", monospace; }
+  .item p, .item .body { font-size: 13px; color: var(--text); margin: 4px 0; }
+  .item .field { margin-top: 6px; font-size: 13px; }
+  .item .field strong { color: var(--text); font-weight: 600; }
+  .evidence { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 24px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .evidence > div { padding: 3px 0; }
+  .evidence .evk { color: var(--text-faint); }
+
+  /* chart wrapper */
+  .chart-wrap { position: relative; height: 280px; }
+  .chart-wrap.tall { height: 320px; }
+  .interpretation { color: var(--text-muted); font-size: 12px; margin-top: 10px; line-height: 1.55; }
+
+  /* reports */
+  .report { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px 24px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+  .report h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
+  .report .meta-line { color: var(--text-faint); font-size: 12px; font-family: "JetBrains Mono", monospace; margin-bottom: 10px; }
+  .report h5 { margin: 14px 0 4px 0; font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .report p { margin: 4px 0; font-size: 13px; color: var(--text); }
+  .report .summary { color: var(--text-muted); font-size: 13px; }
+
+  /* explanations */
+  .explainer { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 22px; margin-bottom: 12px; box-shadow: var(--shadow-sm); }
+  .explainer .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .explainer h4 { margin: 0; font-size: 15px; font-weight: 600; }
+  .explainer .plain { font-size: 14px; color: var(--text); line-height: 1.6; }
+  details { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+  details > summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 12px; }
+  details[open] > summary { margin-bottom: 8px; }
+
+  /* sections */
   section.hidden { display: none; }
+  .section-header { display: flex; align-items: baseline; gap: 12px; margin: 18px 0 10px; }
+  .section-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  .section-header .count { color: var(--text-faint); font-size: 12px; }
+
+  /* toast */
   .toast {
-    position: fixed; bottom: 20px; right: 20px;
-    background: var(--panel-2); border: 1px solid var(--border);
-    padding: 10px 14px; border-radius: 6px; color: var(--text);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
-    opacity: 0; transform: translateY(8px); transition: all 0.2s ease;
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--text); color: white;
+    padding: 12px 18px; border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transform: translateY(8px); pointer-events: none;
+    transition: all 0.2s ease;
+    max-width: 380px;
+    display: flex; align-items: center; gap: 10px;
   }
   .toast.show { opacity: 1; transform: translateY(0); }
-  .pulse { animation: pulse 1s ease-in-out; }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(91,141,239,0.4); }
-    100% { box-shadow: 0 0 0 12px rgba(91,141,239,0); }
+  .toast.good { background: var(--good); }
+  .toast.bad { background: var(--warning); }
+
+  /* prediction cards inner */
+  .stat-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--border-soft); font-size: 13px; }
+  .stat-row:last-child { border-bottom: 0; }
+  .stat-row .k { color: var(--text-muted); }
+  .stat-row .v { font-weight: 600; color: var(--text); }
+
+  /* mini sparkline placeholder */
+  .meter { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .meter > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.4s ease; }
+
+  /* responsive */
+  @media (max-width: 1024px) {
+    .app { grid-template-columns: 1fr; }
+    aside { position: relative; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    nav.primary { flex-direction: row; flex-wrap: wrap; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
+
 <div class="app">
   <aside>
-    <h1>Signal Foundry</h1>
-    <div class="subtle">Reputation Monitor (PoC)</div>
-    <nav id="nav">
-      <a href="#overview" class="active" data-section="overview">Overview</a>
-      <a href="#alerts" data-section="alerts">Alerts</a>
-      <a href="#locations" data-section="locations">Locations</a>
-      <a href="#predictions" data-section="predictions">Predictions</a>
-      <a href="#labs" data-section="labs">Research Labs</a>
-      <a href="#findings" data-section="findings">Findings</a>
-      <a href="#explanations" data-section="explanations">Why &amp; How</a>
-      <a href="#reports" data-section="reports">Reports</a>
-    </nav>
+    <div>
+      <div class="brand">
+        <span class="wordmark">0</span>
+        <span class="arrow">→</span>
+        <span class="num-100">100</span>
+      </div>
+      <div class="tagline">From signal to decision.</div>
+    </div>
+
+    <div>
+      <div class="nav-section">Workspace</div>
+      <div class="pill" id="workspace-pill">Loading…</div>
+    </div>
+
+    <div>
+      <div class="nav-section">Pages</div>
+      <nav class="primary" id="nav">
+        <a href="#overview" class="active" data-section="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          Overview
+        </a>
+        <a href="#alerts" data-section="alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          Alerts
+        </a>
+        <a href="#locations" data-section="locations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Locations
+        </a>
+        <a href="#predictions" data-section="predictions">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
+          Predictions
+        </a>
+        <a href="#labs" data-section="labs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 3v6l-5 9a2 2 0 0 0 1.73 3h12.54A2 2 0 0 0 20 18l-5-9V3"/><line x1="8" y1="3" x2="16" y2="3"/></svg>
+          Research labs
+        </a>
+        <a href="#findings" data-section="findings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Findings
+        </a>
+        <a href="#explanations" data-section="explanations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Why &amp; how
+        </a>
+        <a href="#reports" data-section="reports">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          Reports
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="pill" id="mode-pill">Demo data</div>
+      <div class="pill" id="updated-pill">—</div>
+    </div>
   </aside>
+
   <main>
     <header class="bar">
       <div>
         <h2 id="page-title">Overview</h2>
-        <div class="meta" id="meta-line">Loading...</div>
+        <div class="sub" id="meta-line">Loading…</div>
       </div>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <span class="meta" id="poll-indicator">live polling every 5s</span>
-        <button class="primary" id="refresh-btn">Refresh now</button>
+      <div class="bar-actions">
+        <span class="pill live" id="live-pill" style="display:none;"><span class="dot"></span> Live · 5s</span>
+        <button class="primary" id="refresh-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Refresh now
+        </button>
       </div>
     </header>
 
     <!-- OVERVIEW -->
     <section id="section-overview">
       <div class="kpi-row" id="kpi-row"></div>
-      <div class="card" id="headline-alert"></div>
-      <div class="card" style="margin-top: 14px;">
-        <div class="panel-title">Live sentiment per location</div>
-        <div class="chart-wrap"><canvas id="chart-live"></canvas></div>
-        <div class="interpretation" id="chart-live-interp"></div>
+      <div id="headline-alert-slot"></div>
+
+      <div class="card" style="margin-top: 16px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 12px;">
+          <div>
+            <h3 style="margin:0;">Sentiment by location</h3>
+            <div class="interpretation" style="margin-top:2px;">Per-location mean sentiment, appended every time you refresh.</div>
+          </div>
+          <span class="badge" id="live-points">0 points</span>
+        </div>
+        <div class="chart-wrap tall"><canvas id="chart-live"></canvas></div>
       </div>
-      <div class="grid-2" style="margin-top: 14px;">
+
+      <div class="grid-2" style="margin-top: 16px;">
         <div class="card">
-          <div class="panel-title">Sentiment ranking</div>
+          <h3>Sentiment ranking</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">Recent vs baseline mean for every monitored location.</div>
           <div class="chart-wrap"><canvas id="chart-ranking"></canvas></div>
-          <div class="interpretation">Recent vs baseline mean sentiment for every monitored location.</div>
         </div>
         <div class="card">
-          <div class="panel-title">Recovery forecast</div>
+          <h3>Recovery forecast</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">Predicted sentiment for the focus location with and without the staffing action.</div>
           <div class="chart-wrap"><canvas id="chart-recovery"></canvas></div>
-          <div class="interpretation">Predicted sentiment trajectory for the focus location with and without the staffing action.</div>
         </div>
       </div>
     </section>
@@ -191,8 +404,7 @@
 
     <!-- LOCATIONS -->
     <section id="section-locations" class="hidden">
-      <div class="card">
-        <div class="panel-title">Locations</div>
+      <div class="card" style="padding: 0; overflow: hidden;">
         <table id="locations-table">
           <thead><tr>
             <th>Location</th><th>Recent</th><th>Baseline</th><th>Drop</th>
@@ -207,17 +419,17 @@
     <section id="section-predictions" class="hidden">
       <div class="grid-2">
         <div class="card">
-          <div class="panel-title">Sentiment recovery scenarios</div>
+          <h3>Sentiment recovery scenarios</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">Action scenario closes the gap to baseline in ~5 days; no-action drifts back over ~14.</div>
           <div class="chart-wrap"><canvas id="chart-pred-sentiment"></canvas></div>
-          <div class="interpretation">Action scenario closes the gap to baseline in ~5 days; no-action drifts back over ~14.</div>
         </div>
         <div class="card">
-          <div class="panel-title">Morning queue pressure</div>
+          <h3>Morning queue pressure</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">8 AM queue-pressure index with and without the staffing action.</div>
           <div class="chart-wrap"><canvas id="chart-pred-queue"></canvas></div>
-          <div class="interpretation">8 AM queue-pressure index with and without the staffing action.</div>
         </div>
       </div>
-      <div class="grid-2" style="margin-top: 14px;">
+      <div class="grid-2" style="margin-top: 16px;">
         <div class="card" id="pred-staffing"></div>
         <div class="card" id="pred-competitor"></div>
       </div>
@@ -225,22 +437,21 @@
 
     <!-- LABS -->
     <section id="section-labs" class="hidden">
-      <div class="card">
-        <div class="panel-title">Active labs</div>
-        <div id="labs-active"></div>
-      </div>
-      <details open style="margin-top: 12px;">
+      <div class="section-header"><h3>Active labs</h3><span class="count" id="labs-active-count"></span></div>
+      <div id="labs-active"></div>
+      <details open style="margin-top: 16px;">
         <summary>Suppressed weak signals</summary>
-        <div id="labs-suppressed" style="margin-top: 10px;"></div>
+        <div id="labs-suppressed" style="margin-top: 12px;"></div>
       </details>
     </section>
 
     <!-- FINDINGS -->
     <section id="section-findings" class="hidden">
+      <div class="section-header"><h3>Active findings</h3><span class="count" id="findings-active-count"></span></div>
       <div id="findings-active"></div>
-      <details open style="margin-top: 12px;">
+      <details open style="margin-top: 16px;">
         <summary>Suppressed findings</summary>
-        <div id="findings-suppressed" style="margin-top: 10px;"></div>
+        <div id="findings-suppressed" style="margin-top: 12px;"></div>
       </details>
     </section>
 
@@ -253,89 +464,175 @@
     <section id="section-reports" class="hidden">
       <div id="reports-list"></div>
     </section>
-
   </main>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const BACKEND = ""; // same-origin via /ui mount
+// =============================================================================
+// Configuration
+// =============================================================================
+const BACKEND = "";                              // same origin
 const SESSION = "demo_miners";
 const CHART_ID = "sentiment_trend_by_location";
-let bundle = null;
-let liveChart = null;
-let rankingChart = null;
-let recoveryChart = null;
-let predSentimentChart = null;
-let predQueueChart = null;
+const POLL_MS  = 5000;
 
-function toast(msg, ms = 2200) {
+// Light-theme chart palette
+const PALETTE = ["#4f46e5", "#0891b2", "#059669", "#d97706", "#dc2626", "#7c3aed", "#db2777"];
+const GRID_COLOR = "rgba(15,23,42,0.06)";
+const TICK_COLOR = "#94a3b8";
+const TEXT_COLOR = "#0f172a";
+
+let bundle = null;
+let charts = { live: null, ranking: null, recovery: null, predSent: null, predQueue: null };
+
+// =============================================================================
+// Helpers
+// =============================================================================
+function toast(msg, kind = "") {
   const el = document.getElementById("toast");
   el.textContent = msg;
+  el.className = "toast " + kind;
+  // Force reflow
+  void el.offsetWidth;
   el.classList.add("show");
-  setTimeout(() => el.classList.remove("show"), ms);
+  setTimeout(() => el.classList.remove("show"), 2400);
 }
 
 async function api(path, opts = {}) {
   const r = await fetch(BACKEND + path, opts);
-  if (!r.ok) throw new Error(`${path} -> HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
   const ct = r.headers.get("content-type") || "";
   return ct.includes("application/json") ? r.json() : r.text();
 }
 
-function colorFor(i) {
-  const palette = ["#5b8def", "#4ade80", "#fbbf24", "#f87171", "#a78bfa", "#22d3ee", "#f472b6"];
-  return palette[i % palette.length];
+const pct = (n) => (n == null) ? "—" : (Math.round(n * 1000) / 10) + "%";
+const colorAt = (i) => PALETTE[i % PALETTE.length];
+const formatTime = (iso) => {
+  try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+  catch { return iso; }
+};
+const formatDateTime = (iso) => {
+  try { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); }
+  catch { return iso; }
+};
+
+// Map raw status -> color class for KPI delta
+function deltaClass(status) {
+  if (!status) return "delta-info";
+  if (status === "good") return "delta-good";
+  if (status === "watch") return "delta-watch";
+  if (status === "warning") return "delta-warning";
+  return "delta-info";
 }
 
-function statusClass(s) { return "status-" + (s || "info"); }
-function pct(n) { return (n == null) ? "-" : (Math.round(n * 1000) / 10) + "%"; }
-
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Navigation
-
+// =============================================================================
 document.querySelectorAll("#nav a").forEach((a) => {
   a.addEventListener("click", (e) => {
     e.preventDefault();
-    const target = a.dataset.section;
-    document.querySelectorAll("#nav a").forEach((x) => x.classList.remove("active"));
-    a.classList.add("active");
-    document.querySelectorAll("main section").forEach((s) => s.classList.add("hidden"));
-    document.getElementById("section-" + target).classList.remove("hidden");
-    document.getElementById("page-title").textContent = a.textContent;
+    activateSection(a.dataset.section);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Renderers
+function activateSection(name) {
+  document.querySelectorAll("#nav a").forEach((x) => x.classList.remove("active"));
+  const link = document.querySelector(`#nav a[data-section="${name}"]`);
+  if (link) link.classList.add("active");
+  document.querySelectorAll("main section").forEach((s) => s.classList.add("hidden"));
+  const section = document.getElementById("section-" + name);
+  if (section) section.classList.remove("hidden");
+  document.getElementById("page-title").textContent = link ? link.textContent.trim() : name;
+}
 
+// Deep-link via #hash
+window.addEventListener("hashchange", () => {
+  const name = location.hash.replace("#", "") || "overview";
+  activateSection(name);
+});
+
+// =============================================================================
+// Chart defaults
+// =============================================================================
+const baseOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: "index", intersect: false },
+  plugins: {
+    legend: {
+      labels: { color: TEXT_COLOR, font: { family: "Inter", size: 12, weight: "500" }, boxWidth: 10, boxHeight: 10, padding: 16 },
+      position: "bottom",
+    },
+    tooltip: {
+      backgroundColor: "#0f172a",
+      titleColor: "#fff",
+      bodyColor: "#cbd5e1",
+      borderColor: "transparent",
+      padding: 12,
+      cornerRadius: 8,
+      titleFont: { family: "Inter", weight: "600" },
+      bodyFont: { family: "Inter" },
+    },
+  },
+  scales: {
+    x: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 } }, grid: { color: GRID_COLOR, drawBorder: false } },
+    y: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 } }, grid: { color: GRID_COLOR, drawBorder: false }, beginAtZero: false },
+  },
+};
+
+const lineOpts = {
+  ...baseOpts,
+  elements: {
+    line: { tension: 0.35, borderWidth: 2.5 },
+    point: { radius: 0, hoverRadius: 5, hoverBorderWidth: 2, hoverBackgroundColor: "#fff" },
+  },
+};
+
+const barOpts = {
+  ...baseOpts,
+  scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, beginAtZero: true } },
+};
+
+// =============================================================================
+// Renderers
+// =============================================================================
 function renderKpis() {
   const row = document.getElementById("kpi-row");
   row.innerHTML = "";
   (bundle.kpis || []).forEach((k) => {
     row.insertAdjacentHTML("beforeend", `
-      <div class="card kpi">
+      <div class="card kpi ${deltaClass(k.status)}">
         <div class="label">${k.label}</div>
         <div class="value">${k.value}</div>
-        <div class="delta ${statusClass(k.status)}">${k.delta || ""}</div>
+        <span class="delta">${k.delta || "—"}</span>
       </div>
     `);
   });
 }
 
 function renderHeadlineAlert() {
-  const el = document.getElementById("headline-alert");
+  const slot = document.getElementById("headline-alert-slot");
   const a = (bundle.alerts || [])[0];
-  if (!a) { el.innerHTML = `<div class="meta">No active alerts.</div>`; return; }
-  el.outerHTML = `
-    <div class="alert pulse" id="headline-alert">
-      <h3>${a.title}</h3>
+  if (!a) {
+    slot.innerHTML = `<div class="card"><div class="interpretation">No active alerts.</div></div>`;
+    return;
+  }
+  slot.innerHTML = `
+    <div class="alert pulse">
+      <div class="alert-head">
+        <h3>${a.title}</h3>
+        <span class="badge warning"><span class="dot"></span>${a.severity}</span>
+      </div>
       <div class="why">${a.summary || ""}</div>
-      <div><strong>Likely cause:</strong> ${a.likely_cause || "-"}</div>
-      <div><strong>Recommended action:</strong> ${a.recommended_action || "-"}</div>
-      <div class="meta">Confidence: ${pct(a.confidence)} &middot; Location: ${a.location_name || "-"}</div>
-      ${a.evidence && a.evidence.length ? `<ul>${a.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+      <div class="meta-grid">
+        <div><div class="lbl">Likely cause</div><div class="val">${a.likely_cause || "—"}</div></div>
+        <div><div class="lbl">Recommended action</div><div class="val">${a.recommended_action || "—"}</div></div>
+        <div><div class="lbl">Location</div><div class="val">${a.location_name || "—"}</div></div>
+        <div><div class="lbl">Confidence</div><div class="val">${pct(a.confidence)}</div></div>
+      </div>
+      ${a.evidence && a.evidence.length ? `<ul>${a.evidence.slice(0, 4).map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
     </div>
   `;
 }
@@ -343,216 +640,245 @@ function renderHeadlineAlert() {
 function renderAlertsList() {
   const el = document.getElementById("alerts-list");
   if (!bundle.alerts || !bundle.alerts.length) {
-    el.innerHTML = `<div class="card meta">No active alerts.</div>`; return;
+    el.innerHTML = `<div class="card interpretation">No active alerts.</div>`;
+    return;
   }
   el.innerHTML = bundle.alerts.map((a) => `
-    <div class="card" style="margin-bottom: 12px;">
-      <h3 style="margin:0 0 4px 0;">${a.title}</h3>
-      <div class="meta">${new Date(a.created_at).toLocaleString()} &middot; ${a.location_name} &middot; confidence ${pct(a.confidence)}</div>
-      <p>${a.summary || ""}</p>
-      <div><strong>Likely cause:</strong> ${a.likely_cause || "-"}</div>
-      <div><strong>Recommended action:</strong> ${a.recommended_action || "-"}</div>
-      ${a.evidence && a.evidence.length ? `<ul>${a.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
+    <div class="card" style="margin-bottom: 12px; border-left: 3px solid var(--${a.severity});">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+        <h3 style="margin:0;">${a.title}</h3>
+        <span class="badge ${a.severity}"><span class="dot"></span>${a.severity}</span>
+      </div>
+      <div class="meta-line mono" style="margin-top:4px; color:var(--text-faint); font-size:12px;">
+        ${formatDateTime(a.created_at)} · ${a.location_name} · confidence ${pct(a.confidence)}
+      </div>
+      <p style="margin: 10px 0 4px; color: var(--text-muted);">${a.summary || ""}</p>
+      <div class="field"><strong>Likely cause:</strong> ${a.likely_cause || "—"}</div>
+      <div class="field"><strong>Recommended action:</strong> ${a.recommended_action || "—"}</div>
+      ${a.evidence && a.evidence.length ? `<ul style="margin: 10px 0 0 18px; color: var(--text-muted); font-size: 13px;">${a.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>` : ""}
     </div>
   `).join("");
 }
 
 function renderLocations() {
   const tbody = document.querySelector("#locations-table tbody");
-  tbody.innerHTML = (bundle.locations || []).map((l) => `
+  tbody.innerHTML = (bundle.locations || []).map((l) => {
+    const dropClass = l.sentiment_drop_pct >= 0.15 ? "warning" : (l.sentiment_drop_pct >= 0.05 ? "watch" : "good");
+    return `
     <tr>
-      <td>${l.location_name}</td>
-      <td>${l.recent_sentiment ?? "-"}</td>
-      <td>${l.baseline_sentiment ?? "-"}</td>
-      <td class="${l.sentiment_drop_pct >= 0.15 ? "status-warning" : "status-good"}">${pct(l.sentiment_drop_pct)}</td>
-      <td>${l.recent_review_count}</td>
-      <td><span class="badge ${l.status}">${l.status}</span></td>
+      <td><strong>${l.location_name}</strong></td>
+      <td class="num">${l.recent_sentiment?.toFixed(2) ?? "—"}</td>
+      <td class="num" style="color: var(--text-muted);">${l.baseline_sentiment?.toFixed(2) ?? "—"}</td>
+      <td><span class="badge ${dropClass}">${pct(l.sentiment_drop_pct)}</span></td>
+      <td class="num">${l.recent_review_count}</td>
+      <td><span class="badge ${l.status}"><span class="dot"></span>${l.status}</span></td>
     </tr>
-  `).join("");
+    `;
+  }).join("");
+}
+
+function labCardHtml(l) {
+  return `
+    <div class="item ${l.frontend_visibility || ""}">
+      <h4>${l.lab_name} <span class="badge ${l.status}"><span class="dot"></span>${l.status}</span></h4>
+      <div class="meta-line">score ${l.score} · confidence ${l.confidence}</div>
+      <div class="body">${l.summary || ""}</div>
+      ${l.recommended_actions && l.recommended_actions.length ? `<div class="field"><strong>Action:</strong> ${l.recommended_actions[0].detail}</div>` : ""}
+      ${l.limitations && l.limitations.length ? `<div class="field" style="color: var(--text-muted); font-style: italic;">Caveat: ${l.limitations[0]}</div>` : ""}
+    </div>
+  `;
 }
 
 function renderLabs() {
   const active = (bundle.labs || []).filter((l) => l.frontend_visibility === "active");
   const suppressed = (bundle.labs || []).filter((l) => l.frontend_visibility === "suppressed");
-  const card = (l) => `
-    <div class="finding ${l.frontend_visibility}">
-      <h4>${l.lab_name} <span class="badge ${l.status}">${l.status}</span></h4>
-      <div class="meta-line">score ${l.score} &middot; confidence ${l.confidence}</div>
-      <div>${l.summary || ""}</div>
-      ${l.recommended_actions && l.recommended_actions.length ? `<div style="margin-top:6px;"><strong>Action:</strong> ${l.recommended_actions[0].detail}</div>` : ""}
-      ${l.limitations && l.limitations.length ? `<div class="meta" style="margin-top:6px;"><em>Caveat:</em> ${l.limitations[0]}</div>` : ""}
+  document.getElementById("labs-active").innerHTML = active.map(labCardHtml).join("") || `<div class="card interpretation">No active labs.</div>`;
+  document.getElementById("labs-suppressed").innerHTML = suppressed.map(labCardHtml).join("") || `<div class="interpretation">No suppressed labs.</div>`;
+  document.getElementById("labs-active-count").textContent = `${active.length} active · ${suppressed.length} suppressed`;
+}
+
+function findingCardHtml(f) {
+  return `
+    <div class="item ${f.frontend_visibility || ""}" id="${f.finding_id}">
+      <h4>${f.title} <span class="badge ${f.severity}"><span class="dot"></span>${f.severity}</span></h4>
+      <div class="meta-line">${f.finding_id} · ${f.lab_id} · confidence ${f.confidence ?? "—"}</div>
+      <div class="field"><strong>What was found:</strong> ${f.what_was_found || ""}</div>
+      <div class="field"><strong>Why it matters:</strong> ${f.why_it_matters || ""}</div>
+      ${f.recommended_action ? `<div class="field"><strong>Recommended action:</strong> ${f.recommended_action}</div>` : ""}
+      ${f.evidence && f.evidence.length ? `
+        <div class="field"><strong>Evidence:</strong>
+          <div class="evidence">${f.evidence.map((e) => `<div><span class="evk">${e.label}:</span> ${e.value ?? ""}${e.detail ? " · " + e.detail : ""}</div>`).join("")}</div>
+        </div>` : ""}
+      ${f.why_suppressed ? `<div class="field" style="color: var(--text-muted); font-style: italic; margin-top: 8px;">Suppressed because: ${f.why_suppressed}</div>` : ""}
     </div>
   `;
-  document.getElementById("labs-active").innerHTML = active.map(card).join("") || `<div class="meta">No active labs.</div>`;
-  document.getElementById("labs-suppressed").innerHTML = suppressed.map(card).join("") || `<div class="meta">No suppressed labs.</div>`;
 }
 
 function renderFindings() {
   const active = (bundle.findings || []).filter((f) => f.frontend_visibility === "active");
   const suppressed = (bundle.findings || []).filter((f) => f.frontend_visibility === "suppressed");
-  const card = (f) => `
-    <div class="finding ${f.frontend_visibility}">
-      <h4>${f.title} <span class="badge ${f.severity}">${f.severity}</span></h4>
-      <div class="meta-line">${f.finding_id} &middot; ${f.lab_id} &middot; confidence ${f.confidence ?? "-"}</div>
-      <div><strong>What was found:</strong> ${f.what_was_found || ""}</div>
-      <div style="margin-top:4px;"><strong>Why it matters:</strong> ${f.why_it_matters || ""}</div>
-      ${f.recommended_action ? `<div style="margin-top:4px;"><strong>Recommended action:</strong> ${f.recommended_action}</div>` : ""}
-      ${f.evidence && f.evidence.length ? `
-        <div style="margin-top:8px;"><strong>Evidence:</strong>
-          <div class="evidence">${f.evidence.map((e) => `<div>${e.label}: <span class="meta">${e.value ?? ""}${e.detail ? " &mdash; " + e.detail : ""}</span></div>`).join("")}</div>
-        </div>` : ""}
-      ${f.why_suppressed ? `<div class="meta" style="margin-top:6px;"><em>Suppressed because:</em> ${f.why_suppressed}</div>` : ""}
-    </div>
-  `;
-  document.getElementById("findings-active").innerHTML = active.map(card).join("") || `<div class="meta">No active findings.</div>`;
-  document.getElementById("findings-suppressed").innerHTML = suppressed.map(card).join("") || `<div class="meta">No suppressed findings.</div>`;
+  document.getElementById("findings-active").innerHTML = active.map(findingCardHtml).join("") || `<div class="card interpretation">No active findings.</div>`;
+  document.getElementById("findings-suppressed").innerHTML = suppressed.map(findingCardHtml).join("") || `<div class="interpretation">No suppressed findings.</div>`;
+  document.getElementById("findings-active-count").textContent = `${active.length} active · ${suppressed.length} suppressed`;
 }
 
 function renderExplanations() {
   const el = document.getElementById("explanations-list");
   el.innerHTML = (bundle.explanations || []).map((e) => `
-    <div class="card" style="margin-bottom: 10px;">
-      <h4 style="margin:0 0 4px 0;">${e.title}</h4>
-      <div class="meta-line">confidence ${e.confidence ?? "-"}</div>
-      <div>${e.plain_language}</div>
-      <details style="margin-top: 8px; background: transparent; border: 0; padding: 0;">
+    <div class="explainer">
+      <div class="head">
+        <h4>${e.title}</h4>
+        <span class="badge info">confidence ${e.confidence ?? "—"}</span>
+      </div>
+      <div class="plain">${e.plain_language}</div>
+      <details>
         <summary>Technical detail</summary>
-        <div style="margin-top: 6px;">${e.technical_detail}</div>
+        <div style="margin-top: 8px;">${e.technical_detail}</div>
       </details>
     </div>
-  `).join("");
+  `).join("") || `<div class="card interpretation">No explanations available.</div>`;
 }
 
-function renderReports() {
-  fetch(BACKEND + "/bundle/reports.json").then((r) => r.json()).then((data) => {
+async function renderReports() {
+  try {
+    const data = await api("/bundle/reports.json");
     const el = document.getElementById("reports-list");
     el.innerHTML = (data.reports || []).map((r) => `
       <div class="report">
         <h4>${r.title}</h4>
-        <div class="meta-line">${r.type} &middot; ${r.report_id}</div>
-        <p>${r.summary}</p>
-        ${(r.sections || []).map((s) => `<h5>${s.heading}</h5><div>${s.body}</div>`).join("")}
+        <div class="meta-line">${r.type} · ${r.report_id}</div>
+        <p class="summary">${r.summary}</p>
+        ${(r.sections || []).map((s) => `<h5>${s.heading}</h5><p>${s.body}</p>`).join("")}
       </div>
-    `).join("");
-  });
+    `).join("") || `<div class="card interpretation">No reports.</div>`;
+  } catch (e) {
+    document.getElementById("reports-list").innerHTML = `<div class="card interpretation">Reports not available: ${e.message}</div>`;
+  }
 }
 
 function renderPredictionsExtras() {
   const s = (bundle.predictions || {}).staffing_action || {};
   const c = (bundle.predictions || {}).competitor_impact || {};
   document.getElementById("pred-staffing").innerHTML = `
-    <div class="panel-title">Staffing action forecast</div>
-    <div><strong>${s.action || "-"}</strong></div>
-    <div class="meta">at ${s.location_name || "-"}</div>
-    <ul>
-      <li>Queue pressure reduction: ${pct(s.expected_queue_pressure_reduction_pct)}</li>
-      <li>Wait-time reduction: ${s.expected_wait_time_reduction_min ?? "-"} min</li>
-      <li>Sentiment recovery: ~${s.expected_sentiment_recovery_days ?? "-"} days</li>
-      <li>Complaint reduction: ${pct(s.expected_complaint_reduction_pct)}</li>
-      <li>Confidence: ${pct(s.confidence)}</li>
-    </ul>
+    <h3>Staffing action forecast</h3>
+    <div class="interpretation" style="margin-bottom: 12px;"><strong style="color: var(--text);">${s.action || "—"}</strong> at ${s.location_name || "—"}</div>
+    <div class="stat-row"><span class="k">Queue pressure reduction</span><span class="v">${pct(s.expected_queue_pressure_reduction_pct)}</span></div>
+    <div class="stat-row"><span class="k">Wait-time reduction</span><span class="v">${s.expected_wait_time_reduction_min ?? "—"} min</span></div>
+    <div class="stat-row"><span class="k">Sentiment recovery</span><span class="v">~${s.expected_sentiment_recovery_days ?? "—"} days</span></div>
+    <div class="stat-row"><span class="k">Complaint reduction</span><span class="v">${pct(s.expected_complaint_reduction_pct)}</span></div>
+    <div class="stat-row"><span class="k">Confidence</span><span class="v">${pct(s.confidence)}</span></div>
   `;
   document.getElementById("pred-competitor").innerHTML = `
-    <div class="panel-title">Competitor impact</div>
-    <div><strong>${c.detected_move || "-"}</strong></div>
-    <div class="meta">vs ${c.location_name || "-"}</div>
-    <ul>
-      <li>Estimated revenue risk: ${pct(c.estimated_revenue_risk_pct)}</li>
-      <li>Confidence: ${pct(c.confidence)}</li>
-    </ul>
-    <div class="interpretation">${c.interpretation || ""}</div>
+    <h3>Competitor impact</h3>
+    <div class="interpretation" style="margin-bottom: 12px;"><strong style="color: var(--text);">${c.detected_move || "—"}</strong> vs ${c.location_name || "—"}</div>
+    <div class="stat-row"><span class="k">Estimated revenue risk</span><span class="v">${pct(c.estimated_revenue_risk_pct)}</span></div>
+    <div class="stat-row"><span class="k">Confidence</span><span class="v">${pct(c.confidence)}</span></div>
+    <div class="interpretation" style="margin-top: 12px;">${c.interpretation || ""}</div>
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Charts
-
+// =============================================================================
+// Static charts
+// =============================================================================
 function rankingChartData() {
   const labels = (bundle.locations || []).map((l) => l.location_name);
   return {
     labels,
     datasets: [
-      { label: "Baseline", data: (bundle.locations || []).map((l) => l.baseline_sentiment), backgroundColor: "#243149" },
-      { label: "Recent",   data: (bundle.locations || []).map((l) => l.recent_sentiment),   backgroundColor: "#5b8def" },
+      { label: "Baseline", data: (bundle.locations || []).map((l) => l.baseline_sentiment), backgroundColor: "rgba(15,23,42,0.15)", borderRadius: 6, borderSkipped: false },
+      { label: "Recent",   data: (bundle.locations || []).map((l) => l.recent_sentiment),   backgroundColor: "#4f46e5", borderRadius: 6, borderSkipped: false },
     ],
   };
 }
+
 function recoveryChartData() {
   const rec = (bundle.predictions || {}).sentiment_recovery || [];
   return {
     labels: rec.map((r) => r.date.slice(5)),
     datasets: [
-      { label: "No action",    data: rec.map((r) => r.predicted_sentiment_no_action),         borderColor: "#f87171", backgroundColor: "transparent" },
-      { label: "Extra staff",  data: rec.map((r) => r.predicted_sentiment_with_extra_staff),  borderColor: "#4ade80", backgroundColor: "transparent" },
+      { label: "No action",   data: rec.map((r) => r.predicted_sentiment_no_action),        borderColor: "#dc2626", backgroundColor: "rgba(220,38,38,0.08)", fill: true },
+      { label: "Extra staff", data: rec.map((r) => r.predicted_sentiment_with_extra_staff), borderColor: "#059669", backgroundColor: "rgba(5,150,105,0.10)", fill: true },
     ],
   };
 }
+
 function queueChartData() {
   const q = (bundle.predictions || {}).queue_pressure || [];
   return {
     labels: q.map((r) => r.date.slice(5)),
     datasets: [
-      { label: "No action",   data: q.map((r) => r.predicted_queue_pressure_no_action),       backgroundColor: "#f87171" },
-      { label: "Extra staff", data: q.map((r) => r.predicted_queue_pressure_with_extra_staff), backgroundColor: "#4ade80" },
+      { label: "No action",   data: q.map((r) => r.predicted_queue_pressure_no_action),       backgroundColor: "#dc2626", borderRadius: 6, borderSkipped: false },
+      { label: "Extra staff", data: q.map((r) => r.predicted_queue_pressure_with_extra_staff), backgroundColor: "#059669", borderRadius: 6, borderSkipped: false },
     ],
   };
 }
 
-const baseLineOpts = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: "#e6edf7" } } },
-  scales: {
-    x: { ticks: { color: "#8da0bf" }, grid: { color: "rgba(141,160,191,0.1)" } },
-    y: { ticks: { color: "#8da0bf" }, grid: { color: "rgba(141,160,191,0.1)" } },
-  },
-};
-
 function buildStaticCharts() {
-  if (rankingChart) rankingChart.destroy();
-  rankingChart = new Chart(document.getElementById("chart-ranking"), { type: "bar", data: rankingChartData(), options: baseLineOpts });
-  if (recoveryChart) recoveryChart.destroy();
-  recoveryChart = new Chart(document.getElementById("chart-recovery"), { type: "line", data: recoveryChartData(), options: baseLineOpts });
-  if (predSentimentChart) predSentimentChart.destroy();
-  predSentimentChart = new Chart(document.getElementById("chart-pred-sentiment"), { type: "line", data: recoveryChartData(), options: baseLineOpts });
-  if (predQueueChart) predQueueChart.destroy();
-  predQueueChart = new Chart(document.getElementById("chart-pred-queue"), { type: "bar", data: queueChartData(), options: baseLineOpts });
+  if (charts.ranking) charts.ranking.destroy();
+  charts.ranking = new Chart(document.getElementById("chart-ranking"), { type: "bar", data: rankingChartData(), options: barOpts });
+
+  if (charts.recovery) charts.recovery.destroy();
+  charts.recovery = new Chart(document.getElementById("chart-recovery"), { type: "line", data: recoveryChartData(), options: lineOpts });
+
+  if (charts.predSent) charts.predSent.destroy();
+  charts.predSent = new Chart(document.getElementById("chart-pred-sentiment"), { type: "line", data: recoveryChartData(), options: lineOpts });
+
+  if (charts.predQueue) charts.predQueue.destroy();
+  charts.predQueue = new Chart(document.getElementById("chart-pred-queue"), { type: "bar", data: queueChartData(), options: barOpts });
 }
 
-// Live chart: polls /sessions/.../charts/.../data
+// =============================================================================
+// Live chart
+// =============================================================================
 async function refreshLiveChart() {
   try {
     const data = await api(`/sessions/${SESSION}/charts/${CHART_ID}/data?limit=200`);
     const points = data.data || [];
-    const labels = points.map((p) => new Date(p.time).toLocaleTimeString());
+    document.getElementById("live-points").textContent = `${points.length} point${points.length === 1 ? "" : "s"}`;
+    const labels = points.map((p) => formatTime(p.time));
     const seriesKeys = Array.from(new Set(points.flatMap((p) => Object.keys(p).filter((k) => k !== "time"))));
     const datasets = seriesKeys.map((k, i) => ({
-      label: k.replace("_sentiment", "").replace(/_/g, " "),
+      label: k.replace(/_sentiment$/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       data: points.map((p) => p[k] ?? null),
-      borderColor: colorFor(i),
-      backgroundColor: "transparent",
-      tension: 0.25,
+      borderColor: colorAt(i),
+      backgroundColor: colorAt(i) + "1a",
+      fill: false,
+      tension: 0.35,
+      borderWidth: 2.5,
+      pointRadius: points.length <= 12 ? 3 : 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: "#fff",
+      pointBorderColor: colorAt(i),
+      pointBorderWidth: 2,
     }));
-    if (!liveChart) {
-      liveChart = new Chart(document.getElementById("chart-live"), { type: "line", data: { labels, datasets }, options: baseLineOpts });
+    if (!charts.live) {
+      charts.live = new Chart(document.getElementById("chart-live"), { type: "line", data: { labels, datasets }, options: lineOpts });
     } else {
-      liveChart.data.labels = labels;
-      liveChart.data.datasets = datasets;
-      liveChart.update("none");
+      charts.live.data.labels = labels;
+      charts.live.data.datasets = datasets;
+      charts.live.update("none");
     }
-    document.getElementById("chart-live-interp").textContent =
-      `Live: ${points.length} refresh point(s) so far. Each point is one /refresh of the lab pipeline.`;
+    document.getElementById("live-pill").style.display = "inline-flex";
   } catch (e) {
-    document.getElementById("chart-live-interp").innerHTML = `<span class="status-warning">live data unavailable: ${e.message}</span>`;
+    document.getElementById("live-points").textContent = "offline";
+    console.error("live chart fetch failed:", e);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Bundle load + refresh action
-
+// =============================================================================
+// Bundle load + refresh
+// =============================================================================
 async function loadBundle() {
   bundle = await api("/bundle/dashboard_payload.json");
-  document.getElementById("meta-line").textContent =
-    `${bundle.business?.name || ""} - generated ${new Date(bundle.meta?.generated_at).toLocaleString()}`;
+
+  // Sidebar workspace pill + meta line
+  const biz = bundle.business || {};
+  const focus = biz.focus_location ? ` · focus: ${biz.focus_location}` : "";
+  document.getElementById("workspace-pill").textContent = biz.name || "—";
+  document.getElementById("meta-line").textContent = `Reputation Monitor · ${biz.city || ""}${biz.country ? ", " + biz.country : ""}${focus}`;
+  document.getElementById("updated-pill").textContent = `Updated ${formatDateTime(bundle.meta?.generated_at)}`;
+  document.getElementById("mode-pill").textContent = (bundle.meta?.source_mode || "demo").replace(/_/g, " ");
+
   renderKpis();
   renderHeadlineAlert();
   renderAlertsList();
@@ -567,8 +893,7 @@ async function loadBundle() {
 
 async function ensureBundle() {
   try { await loadBundle(); }
-  catch (e) {
-    // Bundle hasn't been built yet -> ask backend to build, then retry.
+  catch {
     await api(`/sessions/${SESSION}/bundle/rebuild`, { method: "POST" });
     await loadBundle();
   }
@@ -576,27 +901,38 @@ async function ensureBundle() {
 
 async function doRefresh() {
   const btn = document.getElementById("refresh-btn");
-  btn.disabled = true; btn.textContent = "Refreshing...";
+  btn.disabled = true;
+  btn.classList.add("refreshing");
+  const labelNode = btn.childNodes[btn.childNodes.length - 1];
+  const originalLabel = labelNode.textContent;
+  labelNode.textContent = " Refreshing…";
   try {
     const resp = await api(`/sessions/${SESSION}/refresh`, { method: "POST" });
-    toast(`Refresh OK: ${resp.models?.length || 0} models, prediction_changed=${resp.prediction_changed}`);
+    toast(`Refreshed · ${resp.models?.length || 0} models · prediction_changed=${resp.prediction_changed}`, "good");
     await api(`/sessions/${SESSION}/bundle/rebuild`, { method: "POST" });
     await loadBundle();
     await refreshLiveChart();
   } catch (e) {
-    toast("Refresh failed: " + e.message, 4000);
+    toast("Refresh failed: " + e.message, "bad");
   } finally {
-    btn.disabled = false; btn.textContent = "Refresh now";
+    btn.disabled = false;
+    btn.classList.remove("refreshing");
+    labelNode.textContent = originalLabel;
   }
 }
 
 document.getElementById("refresh-btn").addEventListener("click", doRefresh);
 
+// =============================================================================
 // Boot
+// =============================================================================
 (async () => {
+  // Apply hash-based section on load
+  const initial = location.hash.replace("#", "") || "overview";
+  activateSection(initial);
   await ensureBundle();
   await refreshLiveChart();
-  setInterval(refreshLiveChart, 5000);
+  setInterval(refreshLiveChart, POLL_MS);
 })();
 </script>
 </body>
