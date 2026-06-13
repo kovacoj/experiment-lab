@@ -1,0 +1,14 @@
+[project]
+name = "experiment-lab"
+version = "0.1.0"
+description = "Portable Signal Foundry labs template"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "polars>=1.40.1",
+    "pydantic>=2.11.7",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
