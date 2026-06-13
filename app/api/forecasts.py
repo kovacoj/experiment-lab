@@ -291,6 +291,11 @@ def build_sales_forecast(
         ),
         "daily": daily,
         "anomalies": anomalies,
+        # Operator-supplied notes ride along so the dashboard can render
+        # them alongside the projection. Populated by the API layer
+        # (forecasts.py is pure / deterministic and does not read disk),
+        # default None means "no operator context attached".
+        "user_context": None,
     }
 
 

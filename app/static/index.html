@@ -1550,6 +1550,44 @@ function appendChatMessage(role, text, sources = [], meta = {}) {
     wrap.appendChild(metaRow);
   }
 
+  // "Log as evidence" affordance on user messages — POSTs to
+  // /sessions/{id}/context so operator commentary becomes a low-confidence
+  // signal the dashboard can surface alongside automated findings.
+  if (role === "user") {
+    const actionRow = document.createElement("div");
+    actionRow.className = "chat-meta";
+    const logBtn = document.createElement("button");
+    logBtn.className = "chat-suggestion";
+    logBtn.type = "button";
+    logBtn.style.padding = "2px 8px";
+    logBtn.style.fontSize = "11px";
+    logBtn.textContent = "Log as evidence";
+    logBtn.addEventListener("click", async () => {
+      logBtn.disabled = true;
+      logBtn.textContent = "logging…";
+      try {
+        const resp = await fetch(`${BACKEND}/sessions/${SESSION}/context`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            source: "chat-log-evidence",
+            tags: ["chat"],
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const body = await resp.json();
+        logBtn.textContent = `logged · #${body.total_entries}`;
+      } catch (e) {
+        logBtn.textContent = "log failed";
+        logBtn.title = e.message;
+        logBtn.disabled = false;
+      }
+    });
+    actionRow.appendChild(logBtn);
+    wrap.appendChild(actionRow);
+  }
+
   chatBody.appendChild(wrap);
   chatBody.scrollTop = chatBody.scrollHeight;
   return wrap;

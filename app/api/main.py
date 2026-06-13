@@ -38,7 +38,11 @@ from app.api.schemas import (
     MonitoringPlanBuildRequest,
     RefreshRequest,
     RefreshResponse,
+    UserContextCreated,
+    UserContextEntry,
+    UserContextListResponse,
 )
+from app.api import user_context as user_context_store
 from app.api.sentiment_metrics import location_sentiment_snapshot
 from app.api.sessions import get_session
 from app.api.storage import (
@@ -191,11 +195,60 @@ def get_sales_forecast(
       - feature importance + plain-English narrative + anomaly callouts.
     """
     info = _resolve_session(session_id)
-    return build_sales_forecast(
+    forecast = build_sales_forecast(
         session_id=session_id,
         scenario=info["scenario"],
         horizon_days=horizon_days,
         start_date=start_date,
+    )
+    # Attach operator notes so the dashboard can render them next to
+    # the projection. Stays None when the operator has logged nothing.
+    forecast["user_context"] = user_context_store.recent_context_summary(session_id)
+    return forecast
+
+
+@app.post(
+    "/sessions/{session_id}/context",
+    response_model=UserContextCreated,
+    status_code=201,
+)
+def post_user_context(session_id: str, body: UserContextEntry) -> UserContextCreated:
+    """Append operator-supplied context to the session.
+
+    Notes are stored append-only; the lab pipeline never treats them as
+    ground truth. ``/refresh`` and the dashboard expose them as a
+    supplementary low-confidence signal.
+    """
+    _resolve_session(session_id)
+    entry = user_context_store.append_entry(
+        session_id,
+        message=body.message,
+        source=body.source,
+        tags=body.tags,
+    )
+    return UserContextCreated(
+        session_id=session_id,
+        entry_id=entry["entry_id"],
+        message=entry["message"],
+        source=entry["source"],
+        tags=entry["tags"],
+        created_at=entry["created_at"],
+        total_entries=user_context_store.total_count(session_id),
+    )
+
+
+@app.get(
+    "/sessions/{session_id}/context",
+    response_model=UserContextListResponse,
+)
+def get_user_context(session_id: str, limit: int = 50) -> UserContextListResponse:
+    """Return the operator-context tail for the session."""
+    _resolve_session(session_id)
+    entries = user_context_store.list_entries(session_id, limit=limit)
+    return UserContextListResponse(
+        session_id=session_id,
+        count=len(entries),
+        entries=entries,
     )
 
 

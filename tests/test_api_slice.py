@@ -456,3 +456,87 @@ def test_refresh_without_streams_has_no_external_provenance(
     response = client.post("/sessions/demo_miners/refresh", json={})
     assert response.status_code == 200
     assert response.json()["external_provenance"] is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: operator-supplied context (user load)
+
+def test_post_context_persists_entry_and_returns_metadata(client: TestClient) -> None:
+    payload = {
+        "message": "Vinohrady manager called in sick; assistant covering bar.",
+        "source": "ops-handoff",
+        "tags": ["staffing", "vinohrady"],
+    }
+    response = client.post("/sessions/demo_miners/context", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["session_id"] == "demo_miners"
+    assert body["message"] == payload["message"]
+    assert body["source"] == "ops-handoff"
+    assert body["tags"] == ["staffing", "vinohrady"]
+    assert body["entry_id"]
+    assert body["created_at"]
+    assert body["total_entries"] >= 1
+
+
+def test_get_context_lists_persisted_entries(client: TestClient) -> None:
+    for i in range(3):
+        client.post(
+            "/sessions/demo_miners/context",
+            json={"message": f"note {i}", "source": "manual"},
+        )
+    response = client.get("/sessions/demo_miners/context?limit=10")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session_id"] == "demo_miners"
+    assert body["count"] >= 3
+    msgs = [e["message"] for e in body["entries"]]
+    assert "note 2" in msgs
+
+
+def test_post_context_rejects_empty_message_with_422(client: TestClient) -> None:
+    response = client.post("/sessions/demo_miners/context", json={"message": ""})
+    assert response.status_code == 422
+
+
+def test_post_context_unknown_session_returns_404(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_unknown/context", json={"message": "test"}
+    )
+    assert response.status_code == 404
+
+
+def test_refresh_surfaces_recent_user_context(client: TestClient) -> None:
+    # Pre-state: no context => refresh's user_context should be None
+    base = client.post("/sessions/demo_miners/refresh", json={}).json()
+    assert base["user_context"] is None
+
+    # Add an operator note then refresh again
+    client.post(
+        "/sessions/demo_miners/context",
+        json={
+            "message": "Espresso machine #2 down at Vinohrady since 7am.",
+            "source": "chat-log-evidence",
+            "tags": ["equipment"],
+        },
+    )
+    after = client.post("/sessions/demo_miners/refresh", json={}).json()
+    assert after["user_context"] is not None
+    assert after["user_context"]["count_total"] >= 1
+    assert after["user_context"]["confidence_band"] == "operator-low"
+    latest = after["user_context"]["entries"][-1]
+    assert "Espresso machine" in latest["message"]
+    assert latest["source"] == "chat-log-evidence"
+
+
+def test_forecast_surfaces_recent_user_context(client: TestClient) -> None:
+    client.post(
+        "/sessions/demo_miners/context",
+        json={"message": "Sentiment dip is mostly tied to one barista.", "source": "manual"},
+    )
+    response = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=14")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user_context"] is not None
+    assert body["user_context"]["count_total"] >= 1
+    assert body["user_context"]["confidence_band"] == "operator-low"

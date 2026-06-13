@@ -42,6 +42,18 @@ def alerts_log_path(session_id: str) -> Path:
     return session_dir(session_id) / "alerts.json"
 
 
+def user_context_path(session_id: str) -> Path:
+    """Append-only log of operator-supplied context (manual evidence).
+
+    Each entry is a free-text note tagged with a source label (e.g.
+    "manual", "chat-log-evidence", "ops-handoff") plus a timestamp. The
+    lab pipeline never trusts these as ground truth — they surface as
+    low-confidence signals in refresh metadata so the dashboard can show
+    "operator notes" alongside automated findings.
+    """
+    return session_dir(session_id) / "user_context.json"
+
+
 def read_json(path: Path) -> Any | None:
     if not path.exists():
         return None

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.api import user_context as user_context_store
 from app.api.alerts import derive_alerts
 from app.api.apify_client import fetch_dataset_items, run_actor
 from app.api.apify_ingestion import normalize_apify_reviews
@@ -194,6 +195,7 @@ def refresh_session(
             last_updated=timestamp,
         ),
         external_provenance=apify_provenance,
+        user_context=user_context_store.recent_context_summary(session_id),
     )
     return response, plan
 

@@ -137,6 +137,10 @@ class RefreshResponse(BaseModel):
     # Provenance for any external (Apify) stream merged into this refresh.
     # Absent when streams.external was not requested.
     external_provenance: dict[str, Any] | None = None
+    # Most recently logged operator notes for the session. Absent if the
+    # operator has not posted any context. Treated as a low-confidence
+    # supplementary signal — never as ground truth.
+    user_context: dict[str, Any] | None = None
 
 
 class MonitoringPlanBuildRequest(BaseModel):
@@ -147,3 +151,31 @@ class MonitoringPlanBuildRequest(BaseModel):
 class ChartDataResponse(BaseModel):
     chart_id: str
     data: list[dict[str, Any]]
+
+
+class UserContextEntry(BaseModel):
+    """A single operator-supplied note attached to a session.
+
+    Stored append-only in tmp/sessions/{id}/user_context.json. Surfaces
+    in /refresh metadata as a low-confidence supplementary signal — the
+    labs themselves do not consume it as ground truth.
+    """
+    message: str = Field(min_length=1, max_length=2000)
+    source: str = Field(default="manual", max_length=64)
+    tags: list[str] = Field(default_factory=list)
+
+
+class UserContextCreated(BaseModel):
+    session_id: str
+    entry_id: str
+    message: str
+    source: str
+    tags: list[str]
+    created_at: str
+    total_entries: int
+
+
+class UserContextListResponse(BaseModel):
+    session_id: str
+    count: int
+    entries: list[dict[str, Any]]
