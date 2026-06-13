@@ -26,6 +26,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.dashboard_spec import CHART_SENTIMENT_TREND, build_dashboard_spec
+from app.api.forecasts import build_sales_forecast
 from app.api.history_store import read_metric_series
 from app.api.monitoring_plan import load_monitoring_plan
 from app.api.refresh import build_only, refresh_session
@@ -164,6 +165,31 @@ def get_chart_data(session_id: str, chart_id: str, limit: int = 200) -> ChartDat
         raise HTTPException(status_code=404, detail=f"unknown chart_id: {chart_id}")
     points: list[dict[str, Any]] = read_metric_series(session_id, chart_id, limit=limit)
     return ChartDataResponse(chart_id=chart_id, data=points)
+
+
+@app.get("/sessions/{session_id}/forecasts/sales")
+def get_sales_forecast(
+    session_id: str,
+    horizon_days: int = 30,
+    start_date: str | None = None,
+) -> dict[str, Any]:
+    """Synthetic sales / revenue forecast for the dashboard.
+
+    Returns a deterministic forecast horizon (clamped to 7..90 days) with:
+      - per-day baseline / predicted / with-intervention revenue + P10/P90
+      - per-day factor decomposition (seasonality, sentiment, competitor, holiday)
+      - per-location next-7-day rollup
+      - three scenario summaries (do_nothing, add_morning_staff, competitive_promo)
+      - model metadata (id, MAPE, MAE, training window, feature list, retrain timing)
+      - feature importance + plain-English narrative + anomaly callouts.
+    """
+    info = _resolve_session(session_id)
+    return build_sales_forecast(
+        session_id=session_id,
+        scenario=info["scenario"],
+        horizon_days=horizon_days,
+        start_date=start_date,
+    )
 
 
 @app.post("/sessions/{session_id}/bundle/rebuild")

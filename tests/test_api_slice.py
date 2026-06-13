@@ -152,3 +152,104 @@ def test_root_redirects_to_ui(client: TestClient) -> None:
     response = client.get("/", follow_redirects=False)
     assert response.status_code in (302, 307)
     assert response.headers["location"] == "/ui/"
+
+
+# ---------------------------------------------------------------------------
+# Sales forecast endpoint
+
+
+def test_sales_forecast_default_horizon(client: TestClient) -> None:
+    response = client.get("/sessions/demo_miners/forecasts/sales")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session_id"] == "demo_miners"
+    assert body["scenario"] == "reputation_monitor"
+    assert body["horizon_days"] == 30
+    assert len(body["daily"]) == 30
+
+
+def test_sales_forecast_custom_horizon_and_payload_shape(client: TestClient) -> None:
+    response = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=14")
+    assert response.status_code == 200
+    body = response.json()
+
+    # Horizon honored.
+    assert body["horizon_days"] == 14
+    assert len(body["daily"]) == 14
+
+    # Every daily entry has the headline fields and a factor decomposition.
+    required = {
+        "date",
+        "day_of_week",
+        "baseline_revenue_eur",
+        "predicted_revenue_eur",
+        "predicted_with_intervention_eur",
+        "p10_revenue_eur",
+        "p90_revenue_eur",
+        "expected_orders",
+        "expected_avg_order_eur",
+        "factors",
+        "per_location",
+    }
+    for entry in body["daily"]:
+        assert required.issubset(entry), f"missing keys on {entry['date']}"
+        # P10 <= predicted <= P90 by construction.
+        assert entry["p10_revenue_eur"] <= entry["predicted_revenue_eur"] <= entry["p90_revenue_eur"]
+        # Per-location rollup must cover all four Miners locations.
+        assert set(entry["per_location"].keys()) == {
+            "Miners Vinohrady",
+            "Miners Wenceslas",
+            "Miners Letna",
+            "Miners Karlin",
+        }
+
+    # Scenarios include the three demo scenarios and report a non-negative uplift
+    # for the staffing action (intervention closes the sentiment-drop gap).
+    scenario_ids = [s["scenario_id"] for s in body["scenarios"]]
+    assert scenario_ids == ["do_nothing", "add_morning_staff", "competitive_promo"]
+    staff = next(s for s in body["scenarios"] if s["scenario_id"] == "add_morning_staff")
+    do_nothing = next(s for s in body["scenarios"] if s["scenario_id"] == "do_nothing")
+    assert staff["vs_baseline_eur"] >= do_nothing["vs_baseline_eur"]
+
+    # Feature importance is a valid probability-ish distribution (~sums to 1).
+    importance_sum = sum(f["importance"] for f in body["feature_importance"])
+    assert 0.95 <= importance_sum <= 1.05
+
+    # Per-location next-7d view covers every location.
+    assert {row["location_name"] for row in body["by_location_next_7d"]} == {
+        "Miners Vinohrady",
+        "Miners Wenceslas",
+        "Miners Letna",
+        "Miners Karlin",
+    }
+
+    # Model metadata declares an identifier and MAPE.
+    meta = body["model_metadata"]
+    assert meta["model_id"] == "revenue_forecast_v1"
+    assert "validation_mape" in meta
+    assert "features" in meta and "day_of_week" in meta["features"]
+
+
+def test_sales_forecast_clamps_horizon(client: TestClient) -> None:
+    too_long = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=500")
+    assert too_long.status_code == 200
+    assert too_long.json()["horizon_days"] == 90
+
+    too_short = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=1")
+    assert too_short.status_code == 200
+    assert too_short.json()["horizon_days"] == 7
+
+
+def test_sales_forecast_unknown_session_returns_404(client: TestClient) -> None:
+    response = client.get("/sessions/demo_unknown/forecasts/sales")
+    assert response.status_code == 404
+
+
+def test_sales_forecast_is_deterministic_per_scenario(client: TestClient) -> None:
+    """Two back-to-back calls produce identical forecast values (timestamps
+    excepted), which lets the dashboard cache it safely between refreshes."""
+    a = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=21").json()
+    b = client.get("/sessions/demo_miners/forecasts/sales?horizon_days=21").json()
+    assert a["daily"] == b["daily"]
+    assert a["totals"] == b["totals"]
+    assert a["scenarios"] == b["scenarios"]

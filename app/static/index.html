@@ -327,6 +327,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
           Predictions
         </a>
+        <a href="#forecasts" data-section="forecasts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Sales forecast
+        </a>
         <a href="#labs" data-section="labs">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 3v6l-5 9a2 2 0 0 0 1.73 3h12.54A2 2 0 0 0 20 18l-5-9V3"/><line x1="8" y1="3" x2="16" y2="3"/></svg>
           Research labs
@@ -435,6 +439,75 @@
       </div>
     </section>
 
+    <!-- FORECASTS -->
+    <section id="section-forecasts" class="hidden">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom: 14px;">
+        <div>
+          <div class="interpretation" id="forecast-method" style="max-width: 760px;"></div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label class="badge" style="cursor:pointer;">
+            Horizon
+            <select id="forecast-horizon" style="border:0; background:transparent; color:var(--text); font:inherit; font-weight:600; margin-left:4px;">
+              <option value="14">14 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="60">60 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="kpi-row" id="forecast-kpi-row"></div>
+
+      <div class="card" style="margin-top: 16px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 10px;">
+          <div>
+            <h3 style="margin:0;">Revenue forecast</h3>
+            <div class="interpretation" style="margin-top:2px;">Predicted daily revenue with P10–P90 confidence band, baseline, and intervention overlay.</div>
+          </div>
+          <span class="badge" id="forecast-points-pill">—</span>
+        </div>
+        <div class="chart-wrap tall"><canvas id="chart-forecast-revenue"></canvas></div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 16px;">
+        <div class="card">
+          <h3>Scenario comparison</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">Net contribution (€) vs baseline across the forecast horizon.</div>
+          <div class="chart-wrap"><canvas id="chart-forecast-scenarios"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Feature importance</h3>
+          <div class="interpretation" style="margin-bottom: 10px;">Relative contribution of input features to the forecast.</div>
+          <div class="chart-wrap"><canvas id="chart-forecast-features"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 16px;">
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <div style="padding: 18px 20px 12px;">
+            <h3 style="margin:0;">Next 7 days by location</h3>
+            <div class="interpretation" style="margin-top:2px;">Predicted vs baseline revenue per location.</div>
+          </div>
+          <table>
+            <thead><tr><th>Location</th><th>Baseline</th><th>Predicted</th><th>vs Baseline</th></tr></thead>
+            <tbody id="forecast-locations-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>Model card</h3>
+          <div id="forecast-model-card"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px;">
+        <h3>Narrative &amp; anomalies</h3>
+        <div class="interpretation" id="forecast-narrative" style="font-size:13px; color:var(--text); margin-bottom: 14px;"></div>
+        <div id="forecast-anomalies"></div>
+      </div>
+    </section>
+
     <!-- LABS -->
     <section id="section-labs" class="hidden">
       <div class="section-header"><h3>Active labs</h3><span class="count" id="labs-active-count"></span></div>
@@ -485,7 +558,13 @@ const TICK_COLOR = "#94a3b8";
 const TEXT_COLOR = "#0f172a";
 
 let bundle = null;
-let charts = { live: null, ranking: null, recovery: null, predSent: null, predQueue: null };
+let forecast = null;
+let forecastHorizon = 30;
+let charts = {
+  live: null, ranking: null, recovery: null,
+  predSent: null, predQueue: null,
+  forecastRevenue: null, forecastScenarios: null, forecastFeatures: null,
+};
 
 // =============================================================================
 // Helpers
@@ -778,6 +857,279 @@ function renderPredictionsExtras() {
 }
 
 // =============================================================================
+// Forecasts
+// =============================================================================
+const eur = (n) => (n == null) ? "—" : "€" + Math.round(n).toLocaleString();
+const eurK = (n) => {
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1000) return "€" + (n / 1000).toFixed(abs >= 10000 ? 0 : 1) + "k";
+  return "€" + Math.round(n);
+};
+const signedEur = (n) => (n == null) ? "—" : (n >= 0 ? "+" : "−") + "€" + Math.abs(Math.round(n)).toLocaleString();
+const signedPct = (n) => (n == null) ? "—" : (n >= 0 ? "+" : "") + (n * 100).toFixed(1) + "%";
+
+async function fetchForecast() {
+  try {
+    forecast = await api(`/sessions/${SESSION}/forecasts/sales?horizon_days=${forecastHorizon}`);
+    renderForecast();
+  } catch (e) {
+    console.error("forecast fetch failed:", e);
+    document.getElementById("forecast-method").innerHTML =
+      `<span style="color: var(--warning);">Forecast endpoint unavailable: ${e.message}</span>`;
+  }
+}
+
+function renderForecast() {
+  if (!forecast) return;
+  const t = forecast.totals || {};
+
+  // Method line
+  document.getElementById("forecast-method").innerHTML =
+    `<strong style="color: var(--text);">${forecast.method}</strong> · model <span class="mono">${forecast.model_metadata.model_id}</span> · MAPE ${(forecast.model_metadata.validation_mape * 100).toFixed(1)}% · trained on ${forecast.model_metadata.trained_on_days} days`;
+
+  // KPI strip — four cards
+  const kpiRow = document.getElementById("forecast-kpi-row");
+  kpiRow.innerHTML = `
+    <div class="card kpi delta-info">
+      <div class="label">Predicted revenue · ${forecast.horizon_days}d</div>
+      <div class="value">${eur(t.predicted_horizon_revenue_eur)}</div>
+      <span class="delta">${signedPct((t.predicted_horizon_revenue_eur - t.baseline_horizon_revenue_eur) / t.baseline_horizon_revenue_eur)} vs baseline</span>
+    </div>
+    <div class="card kpi ${t.do_nothing_gap_eur < 0 ? 'delta-warning' : 'delta-good'}">
+      <div class="label">Do-nothing gap</div>
+      <div class="value">${signedEur(t.do_nothing_gap_eur)}</div>
+      <span class="delta">If we take no action</span>
+    </div>
+    <div class="card kpi delta-good">
+      <div class="label">Intervention uplift</div>
+      <div class="value">${signedEur(t.intervention_uplift_eur)}</div>
+      <span class="delta">${signedPct(t.intervention_uplift_pct)} on predicted</span>
+    </div>
+    <div class="card kpi ${t.intervention_net_eur >= 0 ? 'delta-good' : 'delta-warning'}">
+      <div class="label">Net after cost</div>
+      <div class="value">${signedEur(t.intervention_net_eur)}</div>
+      <span class="delta">Cost ${eur(t.intervention_cost_eur)}</span>
+    </div>
+  `;
+
+  document.getElementById("forecast-points-pill").textContent =
+    `${forecast.daily.length} day${forecast.daily.length === 1 ? "" : "s"}`;
+
+  // Revenue forecast chart
+  const daily = forecast.daily;
+  const labels = daily.map((d) => d.date.slice(5));
+  if (charts.forecastRevenue) charts.forecastRevenue.destroy();
+  charts.forecastRevenue = new Chart(document.getElementById("chart-forecast-revenue"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        // CI band — upper bound first (invisible fill target), then lower with fill: '-1'
+        {
+          label: "P90",
+          data: daily.map((d) => d.p90_revenue_eur),
+          borderColor: "transparent",
+          backgroundColor: "rgba(79,70,229,0.08)",
+          pointRadius: 0,
+          fill: false,
+          order: 4,
+        },
+        {
+          label: "Confidence band (P10–P90)",
+          data: daily.map((d) => d.p10_revenue_eur),
+          borderColor: "transparent",
+          backgroundColor: "rgba(79,70,229,0.12)",
+          pointRadius: 0,
+          fill: "-1",
+          order: 3,
+        },
+        {
+          label: "Baseline",
+          data: daily.map((d) => d.baseline_revenue_eur),
+          borderColor: "#94a3b8",
+          backgroundColor: "transparent",
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+          order: 2,
+        },
+        {
+          label: "Predicted",
+          data: daily.map((d) => d.predicted_revenue_eur),
+          borderColor: "#dc2626",
+          backgroundColor: "rgba(220,38,38,0.05)",
+          pointRadius: 0,
+          fill: false,
+          borderWidth: 2.5,
+          order: 1,
+        },
+        {
+          label: "Predicted with intervention",
+          data: daily.map((d) => d.predicted_with_intervention_eur),
+          borderColor: "#059669",
+          backgroundColor: "rgba(5,150,105,0.05)",
+          pointRadius: 0,
+          fill: false,
+          borderWidth: 2.5,
+          order: 0,
+        },
+      ],
+    },
+    options: {
+      ...lineOpts,
+      plugins: {
+        ...lineOpts.plugins,
+        tooltip: {
+          ...lineOpts.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${eur(ctx.parsed.y)}`,
+            afterBody: (ctxs) => {
+              const i = ctxs[0]?.dataIndex;
+              if (i == null) return "";
+              const d = daily[i];
+              const flags = [];
+              if (d.is_holiday) flags.push(`Holiday: ${d.holiday_name}`);
+              flags.push(`Day: ${d.day_of_week}`);
+              flags.push(`Orders: ${d.expected_orders.toLocaleString()} @ €${d.expected_avg_order_eur}`);
+              return "\n" + flags.join("\n");
+            },
+          },
+        },
+      },
+      scales: {
+        ...lineOpts.scales,
+        y: {
+          ...lineOpts.scales.y,
+          ticks: { ...lineOpts.scales.y.ticks, callback: (v) => eurK(v) },
+        },
+      },
+    },
+  });
+
+  // Scenarios bar chart
+  const sc = forecast.scenarios || [];
+  if (charts.forecastScenarios) charts.forecastScenarios.destroy();
+  charts.forecastScenarios = new Chart(document.getElementById("chart-forecast-scenarios"), {
+    type: "bar",
+    data: {
+      labels: sc.map((s) => s.label),
+      datasets: [
+        {
+          label: "Net € vs baseline (after cost)",
+          data: sc.map((s) => s.net_eur),
+          backgroundColor: sc.map((s) => s.net_eur >= 0 ? "#059669" : "#dc2626"),
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      ...barOpts,
+      indexAxis: "y",
+      plugins: {
+        ...barOpts.plugins,
+        legend: { display: false },
+        tooltip: {
+          ...barOpts.plugins.tooltip,
+          callbacks: {
+            label: (ctx) => {
+              const s = sc[ctx.dataIndex];
+              return [
+                `Horizon revenue: ${eur(s.horizon_revenue_eur)}`,
+                `vs baseline: ${signedEur(s.vs_baseline_eur)} (${signedPct(s.vs_baseline_pct)})`,
+                `Cost: ${eur(s.cost_eur)}`,
+                `Net: ${signedEur(s.net_eur)}`,
+                `Probability: ${(s.probability * 100).toFixed(0)}%`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 }, callback: (v) => eurK(v) }, grid: { color: GRID_COLOR } },
+        y: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+
+  // Feature importance horizontal bar
+  const fi = forecast.feature_importance || [];
+  if (charts.forecastFeatures) charts.forecastFeatures.destroy();
+  charts.forecastFeatures = new Chart(document.getElementById("chart-forecast-features"), {
+    type: "bar",
+    data: {
+      labels: fi.map((f) => f.feature.replace(/_/g, " ")),
+      datasets: [{
+        label: "Importance",
+        data: fi.map((f) => f.importance),
+        backgroundColor: "#4f46e5",
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      ...barOpts,
+      indexAxis: "y",
+      plugins: { ...barOpts.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 }, callback: (v) => (v * 100).toFixed(0) + "%" }, grid: { color: GRID_COLOR }, beginAtZero: true, max: 0.5 },
+        y: { ticks: { color: TICK_COLOR, font: { family: "Inter", size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+
+  // Per-location 7-day table
+  const tbody = document.getElementById("forecast-locations-tbody");
+  tbody.innerHTML = (forecast.by_location_next_7d || []).map((l) => {
+    const cls = l.vs_baseline_pct <= -0.10 ? "warning" : l.vs_baseline_pct <= -0.03 ? "watch" : "good";
+    return `
+      <tr>
+        <td><strong>${l.location_name}</strong></td>
+        <td class="num" style="color: var(--text-muted);">${eur(l.next_7d_baseline_eur)}</td>
+        <td class="num"><strong>${eur(l.next_7d_predicted_eur)}</strong></td>
+        <td><span class="badge ${cls}">${signedPct(l.vs_baseline_pct)}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  // Model card
+  const m = forecast.model_metadata;
+  document.getElementById("forecast-model-card").innerHTML = `
+    <div class="stat-row"><span class="k">Model</span><span class="v mono">${m.model_id}</span></div>
+    <div class="stat-row"><span class="k">Trained on</span><span class="v">${m.trained_on_days} days</span></div>
+    <div class="stat-row"><span class="k">Validation MAE</span><span class="v">${eur(m.validation_mae_eur)}</span></div>
+    <div class="stat-row"><span class="k">Validation MAPE</span><span class="v">${(m.validation_mape * 100).toFixed(1)}%</span></div>
+    <div class="stat-row"><span class="k">Validation sMAPE</span><span class="v">${(m.validation_smape * 100).toFixed(1)}%</span></div>
+    <div class="stat-row"><span class="k">Last trained</span><span class="v">${formatDateTime(m.trained_at)}</span></div>
+    <div class="stat-row"><span class="k">Next retrain</span><span class="v">${formatDateTime(m.next_retrain_at)}</span></div>
+    <div style="margin-top: 12px;">
+      <div class="panel-title" style="margin-bottom: 6px;">Features</div>
+      <div style="display:flex; flex-wrap:wrap; gap: 6px;">
+        ${m.features.map((f) => `<span class="badge">${f.replace(/_/g, " ")}</span>`).join("")}
+      </div>
+    </div>
+  `;
+
+  // Narrative
+  document.getElementById("forecast-narrative").textContent = forecast.narrative;
+
+  // Anomalies
+  const an = forecast.anomalies || [];
+  document.getElementById("forecast-anomalies").innerHTML = an.length === 0
+    ? `<div class="interpretation">No anomalies flagged in horizon.</div>`
+    : an.map((a) => {
+        const cls = a.delta_eur < -1000 ? "warning" : "watch";
+        return `
+          <div class="item" style="margin-bottom: 8px; border-left: 3px solid var(--${cls});">
+            <h4>${a.date} <span class="badge ${cls}">${a.type.replace(/_/g, " ")}</span> <span class="mono" style="color: var(--text-muted); font-size: 12px; font-weight: 400;">${signedEur(a.delta_eur)}</span></h4>
+            <div class="body" style="margin-top: 4px; color: var(--text-muted);">${a.reason}</div>
+          </div>
+        `;
+      }).join("");
+}
+
+// =============================================================================
 // Static charts
 // =============================================================================
 function rankingChartData() {
@@ -912,6 +1264,7 @@ async function doRefresh() {
     await api(`/sessions/${SESSION}/bundle/rebuild`, { method: "POST" });
     await loadBundle();
     await refreshLiveChart();
+    await fetchForecast();
   } catch (e) {
     toast("Refresh failed: " + e.message, "bad");
   } finally {
@@ -923,6 +1276,12 @@ async function doRefresh() {
 
 document.getElementById("refresh-btn").addEventListener("click", doRefresh);
 
+// Horizon selector triggers a fresh forecast fetch
+document.getElementById("forecast-horizon").addEventListener("change", (e) => {
+  forecastHorizon = parseInt(e.target.value, 10) || 30;
+  fetchForecast();
+});
+
 // =============================================================================
 // Boot
 // =============================================================================
@@ -932,6 +1291,7 @@ document.getElementById("refresh-btn").addEventListener("click", doRefresh);
   activateSection(initial);
   await ensureBundle();
   await refreshLiveChart();
+  await fetchForecast();
   setInterval(refreshLiveChart, POLL_MS);
 })();
 </script>
