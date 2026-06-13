@@ -6,3 +6,4 @@ __pycache__/
 .models/
 .DS_Store
 *.egg-info/
+tmp/
