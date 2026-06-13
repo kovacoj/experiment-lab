@@ -31,6 +31,17 @@ def monitoring_plan_path(session_id: str) -> Path:
     return session_dir(session_id) / "monitoring_plan.json"
 
 
+def decision_cards_path(session_id: str) -> Path:
+    """Latest decision cards from the most recent /refresh."""
+    return session_dir(session_id) / "decision_cards.json"
+
+
+def alerts_log_path(session_id: str) -> Path:
+    """Append-only alert log. Each /refresh appends entries derived from the
+    current lab results; /alerts reads back the tail."""
+    return session_dir(session_id) / "alerts.json"
+
+
 def read_json(path: Path) -> Any | None:
     if not path.exists():
         return None

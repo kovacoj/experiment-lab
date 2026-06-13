@@ -48,7 +48,11 @@ def test_refresh_then_dashboard_then_chart_data(client: TestClient) -> None:
     assert refresh_payload["session_id"] == session_id
     assert refresh_payload["scenario"] == "reputation_monitor"
     assert refresh_payload["prediction_changed"] is True
-    assert refresh_payload["alert"]["should_notify"] is False
+    # Alert envelope is now derived from real lab results: Miners Vinohrady
+    # sits at sentiment ~0.55 (critical) in the cached fixture, so the
+    # refresh now emits should_notify=true with severity in {warning, critical}.
+    assert refresh_payload["alert"]["should_notify"] is True
+    assert refresh_payload["alert"]["severity"] in {"critical", "warning"}
     assert "sentiment_trend_by_location" in refresh_payload["dashboard_delta"]["updated_chart_ids"]
 
     # Monitoring plan is persisted and discoverable.
@@ -309,3 +313,56 @@ def test_chat_unknown_session_returns_404(client: TestClient) -> None:
         json={"message": "hello"},
     )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Cards + alerts (n8n MCP sf_get_session_state / sf_get_session_alerts)
+
+def test_cards_404_before_first_refresh(client: TestClient) -> None:
+    response = client.get("/sessions/demo_miners/cards")
+    assert response.status_code == 404
+
+
+def test_refresh_populates_cards_and_alerts_endpoints(client: TestClient) -> None:
+    refresh = client.post("/sessions/demo_miners/refresh")
+    assert refresh.status_code == 200
+    body = refresh.json()
+    # Refresh response now carries cards + a real alert envelope
+    assert body["decision_cards"], "refresh should populate decision_cards"
+    assert body["alert"]["should_notify"] in (True, False)
+
+    cards = client.get("/sessions/demo_miners/cards")
+    assert cards.status_code == 200
+    cards_payload = cards.json()
+    assert cards_payload["session_id"] == "demo_miners"
+    assert cards_payload["scenario"] == "reputation_monitor"
+    assert isinstance(cards_payload["cards"], list) and cards_payload["cards"]
+    # Card shape: must carry the fields the dashboard / MCP consumer needs
+    first = cards_payload["cards"][0]
+    for key in ("card_id", "title", "card_type", "summary", "priority"):
+        assert key in first
+
+    alerts = client.get("/sessions/demo_miners/alerts")
+    assert alerts.status_code == 200
+    alerts_payload = alerts.json()
+    assert alerts_payload["session_id"] == "demo_miners"
+    assert "alerts" in alerts_payload
+    assert alerts_payload["count"] == len(alerts_payload["alerts"])
+    for entry in alerts_payload["alerts"]:
+        assert entry["severity"] in {"critical", "warning"}
+        assert entry["lab_id"]
+        assert entry["created_at"]
+
+
+def test_alerts_appends_across_refreshes(client: TestClient) -> None:
+    client.post("/sessions/demo_miners/refresh")
+    first = client.get("/sessions/demo_miners/alerts").json()
+    client.post("/sessions/demo_miners/refresh")
+    second = client.get("/sessions/demo_miners/alerts").json()
+    # Second refresh must not shrink the alert log
+    assert second["count"] >= first["count"]
+
+
+def test_cards_and_alerts_unknown_session_404(client: TestClient) -> None:
+    assert client.get("/sessions/demo_unknown/cards").status_code == 404
+    assert client.get("/sessions/demo_unknown/alerts").status_code == 404

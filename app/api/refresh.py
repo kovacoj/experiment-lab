@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.api.alerts import derive_alerts
 from app.api.artifacts import build_prediction_artifacts
 from app.api.dashboard_spec import CHART_SENTIMENT_TREND
 from app.api.history_store import append_metric_point, utcnow_iso
@@ -23,6 +24,8 @@ from app.api.schemas import (
     RefreshResponse,
 )
 from app.api.sentiment_metrics import location_sentiment_snapshot
+from app.api.storage import alerts_log_path, decision_cards_path, read_json, write_json
+from app.labs.decision_cards import compile_decision_cards
 from app.labs.runner import run_demo_scenario
 
 
@@ -58,14 +61,45 @@ def refresh_session(session_id: str, scenario: str) -> tuple[RefreshResponse, Mo
         append_metric_point(session_id, CHART_SENTIMENT_TREND, point)
         updated_chart_ids.append(CHART_SENTIMENT_TREND)
 
+    # Compile + persist decision cards so GET /sessions/{id}/cards is cheap
+    # and doesn't re-run the labs.
+    cards = compile_decision_cards(report)
+    cards_payload = [c.model_dump() for c in cards]
+    write_json(decision_cards_path(session_id), {
+        "session_id": session_id,
+        "scenario": scenario,
+        "generated_at": timestamp,
+        "cards": cards_payload,
+    })
+
+    # Derive + append alerts for this refresh
+    new_alerts = derive_alerts(session_id, scenario, report, snapshot, now_iso=timestamp)
+    if new_alerts:
+        existing = read_json(alerts_log_path(session_id)) or {"alerts": []}
+        history = list(existing.get("alerts", []))
+        history.extend(new_alerts)
+        # Cap to last 200 alert entries to keep the file bounded.
+        write_json(alerts_log_path(session_id), {"alerts": history[-200:]})
+
+    # Headline alert envelope: most critical alert wins
+    top_alert = new_alerts[0] if new_alerts else None
+    alert_env = AlertEnvelope(
+        should_notify=bool(top_alert),
+        title=top_alert.get("title") if top_alert else None,
+        body=top_alert.get("body") if top_alert else None,
+        severity=top_alert.get("severity") if top_alert else None,
+        recommended_action=top_alert.get("recommended_action") if top_alert else None,
+        dedupe_key=top_alert.get("dedupe_key") if top_alert else None,
+    )
+
     response = RefreshResponse(
         session_id=session_id,
         scenario=scenario,
         prediction_changed=bool(artifacts),
         models=[_model_record(r) for r in report.selected + report.warning],
         anomalies=[],
-        alert=AlertEnvelope(should_notify=False),
-        decision_cards=[],
+        alert=alert_env,
+        decision_cards=cards_payload,
         dashboard_delta=DashboardDelta(
             updated_chart_ids=updated_chart_ids,
             last_updated=timestamp,

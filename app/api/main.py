@@ -41,7 +41,12 @@ from app.api.schemas import (
 )
 from app.api.sentiment_metrics import location_sentiment_snapshot
 from app.api.sessions import get_session
-from app.api.storage import base_dir
+from app.api.storage import (
+    alerts_log_path,
+    base_dir,
+    decision_cards_path,
+    read_json,
+)
 from app.export.frontend_bundle import build_bundle
 from app.labs.runner import load_demo_context, prepare_context_for_labs
 
@@ -191,6 +196,48 @@ def get_sales_forecast(
         horizon_days=horizon_days,
         start_date=start_date,
     )
+
+
+@app.get("/sessions/{session_id}/cards")
+def get_session_cards(session_id: str) -> dict[str, Any]:
+    """Return the decision cards from the most recent refresh.
+
+    n8n's `sf_get_session_state` MCP tool calls this. The endpoint is a
+    cheap read of `decision_cards.json` written by `/refresh`; if no
+    refresh has happened yet we 404 to make the missing pre-condition
+    obvious (rather than silently returning an empty list).
+    """
+    _resolve_session(session_id)
+    payload = read_json(decision_cards_path(session_id))
+    if payload is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"no decision cards persisted for {session_id}; "
+                "call /sessions/{id}/refresh first"
+            ),
+        )
+    return payload
+
+
+@app.get("/sessions/{session_id}/alerts")
+def get_session_alerts(session_id: str, limit: int = 50) -> dict[str, Any]:
+    """Return the alert history for the session (newest entries last).
+
+    n8n's `sf_get_session_alerts` MCP tool calls this. Returns an empty
+    list (not 404) when the session is known but no refresh has produced
+    any alerts yet — that's a healthy state, not a missing artifact.
+    """
+    _resolve_session(session_id)
+    payload = read_json(alerts_log_path(session_id)) or {"alerts": []}
+    alerts: list[dict[str, Any]] = list(payload.get("alerts", []))
+    if limit and len(alerts) > limit:
+        alerts = alerts[-limit:]
+    return {
+        "session_id": session_id,
+        "count": len(alerts),
+        "alerts": alerts,
+    }
 
 
 @app.post("/sessions/{session_id}/chat")
