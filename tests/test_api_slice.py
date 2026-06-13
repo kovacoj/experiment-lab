@@ -253,3 +253,59 @@ def test_sales_forecast_is_deterministic_per_scenario(client: TestClient) -> Non
     assert a["daily"] == b["daily"]
     assert a["totals"] == b["totals"]
     assert a["scenarios"] == b["scenarios"]
+
+
+# ---------------------------------------------------------------------------
+# Chat endpoint (stub keyword-routed responder)
+
+def test_chat_routes_status_intent_and_returns_grounded_reply(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_miners/chat",
+        json={"message": "what's the status?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "status"
+    assert payload["engine"] == "stub-keyword-router-v1"
+    assert "Snapshot" in payload["reply"]
+    assert payload["data"]["weakest"]  # display name pulled from real snapshot
+    assert any(s["ref"] == "ui:forecasts" for s in payload["sources"])
+
+
+def test_chat_forecast_intent_parses_horizon_from_message(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_miners/chat",
+        json={"message": "give me the 60-day forecast"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "forecast"
+    assert payload["data"]["horizon_days"] == 60
+    assert "60-day revenue forecast" in payload["reply"]
+
+
+def test_chat_unknown_intent_falls_back_with_help_pointer(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_miners/chat",
+        json={"message": "asdfqwer nothing matches here"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "unknown"
+    assert "help" in payload["reply"].lower()
+
+
+def test_chat_rejects_empty_message_with_400(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_miners/chat",
+        json={"message": "   "},
+    )
+    assert response.status_code == 400
+
+
+def test_chat_unknown_session_returns_404(client: TestClient) -> None:
+    response = client.post(
+        "/sessions/demo_unknown/chat",
+        json={"message": "hello"},
+    )
+    assert response.status_code == 404

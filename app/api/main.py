@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.chat import synthesize_reply
 from app.api.dashboard_spec import CHART_SENTIMENT_TREND, build_dashboard_spec
 from app.api.forecasts import build_sales_forecast
 from app.api.history_store import read_metric_series
@@ -190,6 +191,22 @@ def get_sales_forecast(
         horizon_days=horizon_days,
         start_date=start_date,
     )
+
+
+@app.post("/sessions/{session_id}/chat")
+def post_chat(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Stub conversational endpoint used by the dashboard chat widget.
+
+    Not an LLM. The response is synthesized deterministically by routing
+    the message through a keyword intent matcher and pulling real numbers
+    from the lab snapshot + sales forecast. Always cites the dashboard
+    panel its numbers came from.
+    """
+    info = _resolve_session(session_id)
+    message = (body or {}).get("message", "")
+    if not isinstance(message, str) or not message.strip():
+        raise HTTPException(status_code=400, detail="message must be a non-empty string")
+    return synthesize_reply(message, session_id=session_id, scenario=info["scenario"])
 
 
 @app.post("/sessions/{session_id}/bundle/rebuild")
