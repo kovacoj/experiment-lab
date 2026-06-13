@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.api.alerts import derive_alerts
+from app.api.apify_client import fetch_dataset_items, run_actor
+from app.api.apify_ingestion import normalize_apify_reviews
 from app.api.artifacts import build_prediction_artifacts
 from app.api.dashboard_spec import CHART_SENTIMENT_TREND
 from app.api.history_store import append_metric_point, utcnow_iso
@@ -26,7 +28,15 @@ from app.api.schemas import (
 from app.api.sentiment_metrics import location_sentiment_snapshot
 from app.api.storage import alerts_log_path, decision_cards_path, read_json, write_json
 from app.labs.decision_cards import compile_decision_cards
-from app.labs.runner import run_demo_scenario
+from app.labs.runner import (
+    build_report,
+    load_demo_context,
+    prepare_context_for_labs,
+    run_all_labs,
+    run_demo_scenario,
+)
+from app.labs.schemas import DataSource
+from app.text_engine.source_adapters import load_raw_external_records
 
 
 def _model_record(result) -> dict[str, Any]:
@@ -40,14 +50,93 @@ def _model_record(result) -> dict[str, Any]:
     }
 
 
-def refresh_session(session_id: str, scenario: str) -> tuple[RefreshResponse, MonitoringPlan]:
+def _external_stream_config(streams: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return the ``streams.external`` block if it requests Apify ingestion."""
+    if not streams:
+        return None
+    external = streams.get("external")
+    if not isinstance(external, dict):
+        return None
+    if not (external.get("apify_dataset_id") or external.get("apify_actor_id")):
+        return None
+    return external
+
+
+def _build_apify_augmented_context(scenario: str, external: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Pull items from Apify, merge into demo external records, return context + provenance.
+
+    The lab context's ``external_data`` flips from a file path to an
+    in-memory ``DataSource(records=...)`` so the pipeline doesn't need to
+    touch disk for the merged stream. The on-disk demo fixture is **read
+    once** (never overwritten) and combined with normalized Apify rows.
+    """
+    base = load_demo_context(scenario)
+    demo_records = load_raw_external_records(base.external_data.path)  # type: ignore[arg-type]
+
+    max_items = int(external.get("max_items", 20))
+    dataset_id = external.get("apify_dataset_id")
+    actor_id = external.get("apify_actor_id")
+
+    if dataset_id:
+        apify_result = fetch_dataset_items(str(dataset_id), max_items=max_items)
+    else:
+        apify_result = run_actor(str(actor_id), max_items=max_items)
+
+    normalized = normalize_apify_reviews(apify_result.get("items", []))
+    merged_records: list[dict[str, object]] = list(demo_records) + list(normalized)
+
+    augmented = base.model_copy(
+        update={
+            "external_data": DataSource(records=merged_records),
+            "metadata": {
+                **base.metadata,
+                "apify_mode": apify_result.get("mode"),
+                "apify_actor_id": apify_result.get("actor_id"),
+                "apify_actor_run_id": apify_result.get("actor_run_id"),
+                "apify_items_received": len(apify_result.get("items", [])),
+                "apify_items_ingested": len(normalized),
+                "apify_error": apify_result.get("error"),
+            },
+        }
+    )
+    provenance = {
+        "mode": apify_result.get("mode"),
+        "actor_id": apify_result.get("actor_id"),
+        "actor_run_id": apify_result.get("actor_run_id"),
+        "received": len(apify_result.get("items", [])),
+        "ingested": len(normalized),
+        "error": apify_result.get("error"),
+    }
+    return augmented, provenance
+
+
+def refresh_session(
+    session_id: str,
+    scenario: str,
+    *,
+    streams: dict[str, Any] | None = None,
+) -> tuple[RefreshResponse, MonitoringPlan]:
     """Run labs, refresh dashboard chart data, persist artifacts.
 
     Returns the response payload plus the (newly-saved) monitoring plan so
     the caller can decide what to render. The plan is rebuilt from every
     refresh — there is no separate "build vs refresh" distinction yet.
+
+    If ``streams.external`` requests Apify ingestion the demo external
+    fixture is merged with normalized Apify rows before the labs run.
     """
-    context, report = run_demo_scenario(scenario)
+    external_cfg = _external_stream_config(streams)
+    if external_cfg is None:
+        context, report = run_demo_scenario(scenario)
+        apify_provenance: dict[str, Any] | None = None
+    else:
+        augmented, apify_provenance = _build_apify_augmented_context(scenario, external_cfg)
+        results = run_all_labs(scenario, augmented)
+        report = build_report(augmented, results)
+        # `run_demo_scenario` returns the prepared context (with
+        # text_documents/text_signals populated) so the dashboard snapshot
+        # can read them. Mirror that here for the Apify branch.
+        context = prepare_context_for_labs(augmented)
     artifacts = build_prediction_artifacts(report)
     plan = build_monitoring_plan(session_id, scenario, artifacts)
     save_monitoring_plan(plan)
@@ -104,6 +193,7 @@ def refresh_session(session_id: str, scenario: str) -> tuple[RefreshResponse, Mo
             updated_chart_ids=updated_chart_ids,
             last_updated=timestamp,
         ),
+        external_provenance=apify_provenance,
     )
     return response, plan
 

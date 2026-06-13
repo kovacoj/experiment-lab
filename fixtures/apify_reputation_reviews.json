@@ -1,0 +1,98 @@
+[
+  {
+    "reviewId": "google-vinohrady-apify-001",
+    "publishedAtDate": "2026-06-08T07:55:00.000Z",
+    "url": "https://www.google.com/maps/reviews/vinohrady-apify-001",
+    "stars": 2,
+    "text": "Service at Miners Vinohrady has slipped lately. Waited almost 20 minutes for a flat white this morning and the cup wasn't even full. Used to love this place.",
+    "language": "en",
+    "name": "Honza K.",
+    "placeName": "Miners Vinohrady",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 1, "threeStar": 0, "fourStar": 0, "fiveStar": 0},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-vinohrady-apify-002",
+    "publishedAtDate": "2026-06-09T08:42:00.000Z",
+    "url": "https://www.google.com/maps/reviews/vinohrady-apify-002",
+    "stars": 1,
+    "text": "Miners Vinohrady at 8:30 AM: only one barista, queue out the door, espresso pulled too fast. Manager nowhere to be seen. This is becoming the norm.",
+    "language": "en",
+    "name": "Lucie P.",
+    "placeName": "Miners Vinohrady",
+    "ratingDistribution": {"oneStar": 1, "twoStar": 0, "threeStar": 0, "fourStar": 0, "fiveStar": 0},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-vinohrady-apify-003",
+    "publishedAtDate": "2026-06-10T09:14:00.000Z",
+    "url": "https://www.google.com/maps/reviews/vinohrady-apify-003",
+    "stars": 3,
+    "text": "Decent beans but staffing at Miners Vinohrady is a problem during morning rush. Two people on bar can't keep up with the line.",
+    "language": "en",
+    "name": "Marek S.",
+    "placeName": "Miners Vinohrady",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 0, "threeStar": 1, "fourStar": 0, "fiveStar": 0},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-wenceslas-apify-001",
+    "publishedAtDate": "2026-06-09T11:20:00.000Z",
+    "url": "https://www.google.com/maps/reviews/wenceslas-apify-001",
+    "stars": 4,
+    "text": "Miners Wenceslas does a great latte and the staff are friendly. Mid-morning was busy but the queue moved fast.",
+    "language": "en",
+    "name": "Eliska V.",
+    "placeName": "Miners Wenceslas",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 0, "threeStar": 0, "fourStar": 1, "fiveStar": 0},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-wenceslas-apify-002",
+    "publishedAtDate": "2026-06-10T15:05:00.000Z",
+    "url": "https://www.google.com/maps/reviews/wenceslas-apify-002",
+    "stars": 5,
+    "text": "Best cortado on Wenceslas Square. Miners Wenceslas always reliable.",
+    "language": "en",
+    "name": "Tomas R.",
+    "placeName": "Miners Wenceslas",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 0, "threeStar": 0, "fourStar": 0, "fiveStar": 1},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-karlin-apify-001",
+    "publishedAtDate": "2026-06-09T13:40:00.000Z",
+    "url": "https://www.google.com/maps/reviews/karlin-apify-001",
+    "stars": 4,
+    "text": "Miners Karlin has the best afternoon vibe in the neighborhood. Good filter coffee, reliable wifi.",
+    "language": "en",
+    "name": "Adela H.",
+    "placeName": "Miners Karlin",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 0, "threeStar": 0, "fourStar": 1, "fiveStar": 0},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-karlin-apify-002",
+    "publishedAtDate": "2026-06-10T17:25:00.000Z",
+    "url": "https://www.google.com/maps/reviews/karlin-apify-002",
+    "stars": 5,
+    "text": "Friendly staff and consistent espresso at Miners Karlin. My new go-to.",
+    "language": "en",
+    "name": "Pavel D.",
+    "placeName": "Miners Karlin",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 0, "threeStar": 0, "fourStar": 0, "fiveStar": 1},
+    "ownerResponse": null
+  },
+  {
+    "reviewId": "google-vinohrady-apify-004",
+    "publishedAtDate": "2026-06-11T08:10:00.000Z",
+    "url": "https://www.google.com/maps/reviews/vinohrady-apify-004",
+    "stars": 2,
+    "text": "Another rough morning at Miners Vinohrady. Pastry case half empty, barista clearly stressed. Something needs to change.",
+    "language": "en",
+    "name": "Jana M.",
+    "placeName": "Miners Vinohrady",
+    "ratingDistribution": {"oneStar": 0, "twoStar": 1, "threeStar": 0, "fourStar": 0, "fiveStar": 0},
+    "ownerResponse": null
+  }
+]

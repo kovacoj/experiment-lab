@@ -134,6 +134,9 @@ class RefreshResponse(BaseModel):
     alert: AlertEnvelope
     decision_cards: list[dict[str, Any]] = Field(default_factory=list)
     dashboard_delta: DashboardDelta
+    # Provenance for any external (Apify) stream merged into this refresh.
+    # Absent when streams.external was not requested.
+    external_provenance: dict[str, Any] | None = None
 
 
 class MonitoringPlanBuildRequest(BaseModel):

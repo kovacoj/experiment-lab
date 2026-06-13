@@ -366,3 +366,93 @@ def test_alerts_appends_across_refreshes(client: TestClient) -> None:
 def test_cards_and_alerts_unknown_session_404(client: TestClient) -> None:
     assert client.get("/sessions/demo_unknown/cards").status_code == 404
     assert client.get("/sessions/demo_unknown/alerts").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Apify ingestion (Phase 2): /refresh with streams.external must merge
+# normalized Apify rows into the lab context and surface provenance.
+
+def test_apify_client_cached_mode_returns_fixture(monkeypatch) -> None:
+    """Default mode reads the on-disk reputation review fixture."""
+    from app.api.apify_client import run_actor, mode
+    monkeypatch.delenv("APIFY_MODE", raising=False)
+    assert mode() == "cached"
+    result = run_actor(max_items=5)
+    assert result["mode"] == "cached"
+    assert result["actor_run_id"] == "cached-fixture"
+    assert result["error"] is None
+    assert len(result["items"]) == 5
+    # Items still carry the raw Apify-Google-Reviews shape
+    first = result["items"][0]
+    for key in ("reviewId", "stars", "text", "placeName"):
+        assert key in first
+
+
+def test_apify_ingestion_normalizes_review_to_raw_review_shape() -> None:
+    """Normalization must produce records the source_adapters can ingest."""
+    from app.api.apify_ingestion import normalize_apify_reviews
+    sample = [
+        {
+            "reviewId": "google-test-001",
+            "publishedAtDate": "2026-06-08T07:55:00.000Z",
+            "url": "https://example.com/r1",
+            "stars": 2,
+            "text": "Service slow at Miners Vinohrady this morning.",
+            "language": "en",
+            "placeName": "Miners Vinohrady",
+        },
+        {
+            # Missing text -> must be dropped
+            "reviewId": "google-test-002",
+            "publishedAtDate": "2026-06-08T08:00:00.000Z",
+            "stars": 5,
+            "placeName": "Miners Wenceslas",
+        },
+    ]
+    out = normalize_apify_reviews(sample)
+    assert len(out) == 1, "rows missing text must be dropped"
+    record = out[0]
+    assert record["dataset"] == "raw_review"
+    assert record["entity_name"] == "Miners Vinohrady"
+    assert record["entity_type"] == "location"
+    assert record["time_bucket"] == "morning"
+    assert record["language"] == "en"
+    assert record["sentiment_score"] == 0.35  # stars=2
+    assert record["ingested_via"] == "apify"
+
+
+def test_refresh_with_apify_stream_merges_and_reports_provenance(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("APIFY_MODE", "cached")
+    response = client.post(
+        "/sessions/demo_miners/refresh",
+        json={
+            "source": "manual",
+            "mode": "demo",
+            "streams": {
+                "external": {
+                    "apify_dataset_id": "demo-dataset-stub",
+                    "max_items": 8,
+                }
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    prov = body["external_provenance"]
+    assert prov is not None
+    assert prov["mode"] == "cached"
+    # received == clamp(max_items, fixture length); ingested <= received
+    assert prov["received"] == 8
+    assert 0 < prov["ingested"] <= prov["received"]
+    assert prov["error"] is None
+
+
+def test_refresh_without_streams_has_no_external_provenance(
+    client: TestClient,
+) -> None:
+    """Existing flow must stay backward compatible."""
+    response = client.post("/sessions/demo_miners/refresh", json={})
+    assert response.status_code == 200
+    assert response.json()["external_provenance"] is None

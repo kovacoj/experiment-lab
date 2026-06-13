@@ -115,7 +115,8 @@ def health() -> dict[str, str]:
 def post_refresh(session_id: str, body: RefreshRequest | None = None) -> RefreshResponse:
     info = _resolve_session(session_id)
     scenario = (body.scenario if body else None) or info["scenario"]
-    response, _ = refresh_session(session_id, scenario)
+    streams = body.streams if body else None
+    response, _ = refresh_session(session_id, scenario, streams=streams)
     return response
 
 
