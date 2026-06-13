@@ -50,6 +50,61 @@ python -m app.labs.runner --scenario reputation_monitor
 python -m app.labs.runner --scenario supply_chain_risk
 ```
 
+## Local Sentiment Model (XLM-RoBERTa)
+
+Use the local sentiment model so teammates can run sentiment inference without Hugging Face MCP at runtime.
+
+Model used:
+
+- `cardiffnlp/twitter-xlm-roberta-base-sentiment`
+
+### 1) Install dependencies
+
+From `experiment-lab/`:
+
+```bash
+uv sync
+```
+
+### 2) Download model files locally
+
+```bash
+uv run python scripts/download_sentiment_model.py
+```
+
+This downloads model assets to:
+
+- `.models/sentiment/cardiffnlp-twitter-xlm-roberta-base-sentiment`
+
+`.models/` is gitignored and must not be committed.
+
+### 3) Verify inference
+
+```bash
+uv run python scripts/smoke_test_sentiment.py
+```
+
+### 4) Verify offline inference
+
+```bash
+HF_HUB_OFFLINE=1 uv run python scripts/smoke_test_sentiment.py
+```
+
+If this passes, sentiment inference runs from local model files and does not require network access.
+
+### Optional env defaults
+
+If you manage env vars locally, these defaults are expected:
+
+```bash
+SENTIMENT_MODE=local
+SENTIMENT_MODEL_ID=cardiffnlp/twitter-xlm-roberta-base-sentiment
+SENTIMENT_MODEL_DIR=.models/sentiment/cardiffnlp-twitter-xlm-roberta-base-sentiment
+SENTIMENT_DEVICE=cpu
+SENTIMENT_BATCH_SIZE=4
+SENTIMENT_MAX_CHARS=800
+```
+
 ## Experiment Lab Skill
 
 Use the stable local skill wrapper when an agent or developer needs structured machine output instead of importing internal modules directly.
@@ -131,4 +186,7 @@ make docker-build
 make docker-run
 make docker-run-supply-chain
 make docker-test
+make download-sentiment-model
+make smoke-sentiment
+make smoke-sentiment-offline
 ```
