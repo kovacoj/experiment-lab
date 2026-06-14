@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,7 @@ from app.api.dashboard_spec import CHART_SENTIMENT_TREND, build_dashboard_spec
 from app.api.forecasts import build_sales_forecast
 from app.api.history_store import read_metric_series
 from app.api.monitoring_plan import load_monitoring_plan
+from app.api.n8n_emitter import emit_refresh_event
 from app.api.refresh import build_only, refresh_session
 from app.api.schemas import (
     ChartDataResponse,
@@ -155,11 +156,20 @@ def health() -> dict[str, str]:
 
 
 @app.post("/sessions/{session_id}/refresh", response_model=RefreshResponse)
-def post_refresh(session_id: str, body: RefreshRequest | None = None) -> RefreshResponse:
+def post_refresh(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    body: RefreshRequest | None = None,
+) -> RefreshResponse:
     info = _resolve_session(session_id)
     scenario = (body.scenario if body else None) or info["scenario"]
     streams = body.streams if body else None
+    source = (body.source if body else None) or "manual"
     response, _ = refresh_session(session_id, scenario, streams=streams)
+    # Mirror to n8n after the response is returned to the caller. The
+    # emitter is best-effort and a no-op when N8N_REFRESH_WEBHOOK_URL
+    # is unset (e.g. in the test suite).
+    background_tasks.add_task(emit_refresh_event, session_id, source, response)
     return response
 
 
